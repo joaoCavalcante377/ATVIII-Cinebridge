@@ -1,36 +1,27 @@
-{
-  "ferramenta": "c8 + node:test (Node 24 TypeScript nativo)",
-  "escopo": "Todos os arquivos src/**/*.ts; nenhuma exclusão adicional",
-  "total": {
-    "lines": {
-      "total": 1482,
-      "covered": 1439,
-      "skipped": 0,
-      "pct": 97.09
-    },
-    "statements": {
-      "total": 1482,
-      "covered": 1439,
-      "skipped": 0,
-      "pct": 97.09
-    },
-    "functions": {
-      "total": 125,
-      "covered": 120,
-      "skipped": 0,
-      "pct": 96
-    },
-    "branches": {
-      "total": 738,
-      "covered": 726,
-      "skipped": 0,
-      "pct": 98.37
-    },
-    "branchesTrue": {
-      "total": 0,
-      "covered": 0,
-      "skipped": 0,
-      "pct": 100
-    }
-  }
+{"total": {"lines":{"total":1906,"covered":1863,"skipped":0,"pct":97.74},"statements":{"total":1906,"covered":1863,"skipped":0,"pct":97.74},"functions":{"total":207,"covered":201,"skipped":0,"pct":97.1},"branches":{"total":945,"covered":926,"skipped":0,"pct":97.98},"branchesTrue":{"total":0,"covered":0,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\server.ts": {"lines":{"total":20,"covered":0,"skipped":0,"pct":0},"functions":{"total":1,"covered":0,"skipped":0,"pct":0},"statements":{"total":20,"covered":0,"skipped":0,"pct":0},"branches":{"total":1,"covered":0,"skipped":0,"pct":0}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\application\\catalog.ts": {"lines":{"total":65,"covered":65,"skipped":0,"pct":100},"functions":{"total":4,"covered":4,"skipped":0,"pct":100},"statements":{"total":65,"covered":65,"skipped":0,"pct":100},"branches":{"total":42,"covered":41,"skipped":0,"pct":97.61}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\application\\observers.ts": {"lines":{"total":54,"covered":54,"skipped":0,"pct":100},"functions":{"total":10,"covered":10,"skipped":0,"pct":100},"statements":{"total":54,"covered":54,"skipped":0,"pct":100},"branches":{"total":21,"covered":21,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\application\\ports.ts": {"lines":{"total":17,"covered":0,"skipped":0,"pct":0},"functions":{"total":1,"covered":0,"skipped":0,"pct":0},"statements":{"total":17,"covered":0,"skipped":0,"pct":0},"branches":{"total":1,"covered":0,"skipped":0,"pct":0}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\application\\recommendation-cache.ts": {"lines":{"total":35,"covered":35,"skipped":0,"pct":100},"functions":{"total":3,"covered":3,"skipped":0,"pct":100},"statements":{"total":35,"covered":35,"skipped":0,"pct":100},"branches":{"total":14,"covered":14,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\application\\recommendation-system.ts": {"lines":{"total":34,"covered":34,"skipped":0,"pct":100},"functions":{"total":6,"covered":6,"skipped":0,"pct":100},"statements":{"total":34,"covered":34,"skipped":0,"pct":100},"branches":{"total":14,"covered":14,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\application\\service.ts": {"lines":{"total":188,"covered":188,"skipped":0,"pct":100},"functions":{"total":16,"covered":16,"skipped":0,"pct":100},"statements":{"total":188,"covered":188,"skipped":0,"pct":100},"branches":{"total":114,"covered":114,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\domain\\allocation.ts": {"lines":{"total":73,"covered":73,"skipped":0,"pct":100},"functions":{"total":5,"covered":5,"skipped":0,"pct":100},"statements":{"total":73,"covered":73,"skipped":0,"pct":100},"branches":{"total":66,"covered":65,"skipped":0,"pct":98.48}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\domain\\factory-contracts.ts": {"lines":{"total":19,"covered":19,"skipped":0,"pct":100},"functions":{"total":0,"covered":0,"skipped":0,"pct":100},"statements":{"total":19,"covered":19,"skipped":0,"pct":100},"branches":{"total":1,"covered":1,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\domain\\family-components.ts": {"lines":{"total":143,"covered":143,"skipped":0,"pct":100},"functions":{"total":26,"covered":26,"skipped":0,"pct":100},"statements":{"total":143,"covered":143,"skipped":0,"pct":100},"branches":{"total":85,"covered":78,"skipped":0,"pct":91.76}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\domain\\index.ts": {"lines":{"total":8,"covered":8,"skipped":0,"pct":100},"functions":{"total":0,"covered":0,"skipped":0,"pct":100},"statements":{"total":8,"covered":8,"skipped":0,"pct":100},"branches":{"total":1,"covered":1,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\domain\\model.ts": {"lines":{"total":41,"covered":41,"skipped":0,"pct":100},"functions":{"total":15,"covered":14,"skipped":0,"pct":93.33},"statements":{"total":41,"covered":41,"skipped":0,"pct":100},"branches":{"total":17,"covered":17,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\domain\\orchestrator.ts": {"lines":{"total":75,"covered":75,"skipped":0,"pct":100},"functions":{"total":7,"covered":7,"skipped":0,"pct":100},"statements":{"total":75,"covered":75,"skipped":0,"pct":100},"branches":{"total":65,"covered":63,"skipped":0,"pct":96.92}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\domain\\project-factories.ts": {"lines":{"total":122,"covered":122,"skipped":0,"pct":100},"functions":{"total":35,"covered":35,"skipped":0,"pct":100},"statements":{"total":122,"covered":122,"skipped":0,"pct":100},"branches":{"total":72,"covered":72,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\domain\\strategies.ts": {"lines":{"total":99,"covered":99,"skipped":0,"pct":100},"functions":{"total":11,"covered":11,"skipped":0,"pct":100},"statements":{"total":99,"covered":99,"skipped":0,"pct":100},"branches":{"total":59,"covered":58,"skipped":0,"pct":98.3}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\domain\\types.ts": {"lines":{"total":70,"covered":70,"skipped":0,"pct":100},"functions":{"total":2,"covered":2,"skipped":0,"pct":100},"statements":{"total":70,"covered":70,"skipped":0,"pct":100},"branches":{"total":3,"covered":3,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\domain\\visitors.ts": {"lines":{"total":115,"covered":115,"skipped":0,"pct":100},"functions":{"total":19,"covered":19,"skipped":0,"pct":100},"statements":{"total":115,"covered":115,"skipped":0,"pct":100},"branches":{"total":138,"covered":138,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\http\\app.ts": {"lines":{"total":102,"covered":102,"skipped":0,"pct":100},"functions":{"total":3,"covered":2,"skipped":0,"pct":66.66},"statements":{"total":102,"covered":102,"skipped":0,"pct":100},"branches":{"total":50,"covered":48,"skipped":0,"pct":96}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\http\\schemas.ts": {"lines":{"total":82,"covered":82,"skipped":0,"pct":100},"functions":{"total":0,"covered":0,"skipped":0,"pct":100},"statements":{"total":82,"covered":82,"skipped":0,"pct":100},"branches":{"total":1,"covered":1,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\infrastructure\\database.ts": {"lines":{"total":176,"covered":176,"skipped":0,"pct":100},"functions":{"total":17,"covered":17,"skipped":0,"pct":100},"statements":{"total":176,"covered":176,"skipped":0,"pct":100},"branches":{"total":92,"covered":92,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\infrastructure\\entities.ts": {"lines":{"total":90,"covered":90,"skipped":0,"pct":100},"functions":{"total":2,"covered":2,"skipped":0,"pct":100},"statements":{"total":90,"covered":90,"skipped":0,"pct":100},"branches":{"total":3,"covered":3,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\infrastructure\\event-bus.ts": {"lines":{"total":155,"covered":155,"skipped":0,"pct":100},"functions":{"total":10,"covered":10,"skipped":0,"pct":100},"statements":{"total":155,"covered":155,"skipped":0,"pct":100},"branches":{"total":59,"covered":58,"skipped":0,"pct":98.3}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\infrastructure\\migration-families.ts": {"lines":{"total":14,"covered":14,"skipped":0,"pct":100},"functions":{"total":3,"covered":3,"skipped":0,"pct":100},"statements":{"total":14,"covered":14,"skipped":0,"pct":100},"branches":{"total":4,"covered":4,"skipped":0,"pct":100}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\infrastructure\\migration.ts": {"lines":{"total":75,"covered":69,"skipped":0,"pct":92},"functions":{"total":5,"covered":4,"skipped":0,"pct":80},"statements":{"total":75,"covered":69,"skipped":0,"pct":92},"branches":{"total":7,"covered":5,"skipped":0,"pct":71.42}}
+,"C:\\Users\\joaoc\\Documents\\Codex\\2026-09-23\\oqq\\outputs\\cinebridge-atv2\\src\\infrastructure\\worker.ts": {"lines":{"total":34,"covered":34,"skipped":0,"pct":100},"functions":{"total":6,"covered":5,"skipped":0,"pct":83.33},"statements":{"total":34,"covered":34,"skipped":0,"pct":100},"branches":{"total":15,"covered":15,"skipped":0,"pct":100}}
 }

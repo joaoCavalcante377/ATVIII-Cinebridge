@@ -1,0 +1,44 @@
+{
+  "titulo": "Vozes do bairro",
+  "genero": "drama",
+  "duracaoMinutos": 20,
+  "orcamentoCentavos": 300000,
+  "inicio": "2027-03-01",
+  "prazo": "2027-03-30",
+  "tipoCaptacao": "documentario",
+  "localizacao": "São Paulo",
+  "estrategia": "cosseno",
+  "parametros": {
+    "pesoCompetencia": 0.65,
+    "pesoAvaliacao": 0.25,
+    "pesoPreco": 0.1,
+    "limiteCandidatos": 10
+  },
+  "papeis": [
+    {
+      "papel": "DIRETOR",
+      "peso": 1,
+      "competencias": []
+    },
+    {
+      "papel": "SONOPLASTA",
+      "peso": 1,
+      "competencias": []
+    },
+    {
+      "papel": "EDITOR",
+      "peso": 1,
+      "competencias": []
+    }
+  ],
+  "tipoProjeto": "documentario",
+  "especificacoes": {
+    "tema": "Memórias do bairro",
+    "entrevistados": [
+      "Maria",
+      "José"
+    ],
+    "autorizacoesConfirmadas": true,
+    "reservaOrcamentoCentavos": 20000
+  }
+}

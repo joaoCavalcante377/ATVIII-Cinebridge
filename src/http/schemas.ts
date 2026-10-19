@@ -27,12 +27,29 @@ export const projetoSchema = {
     titulo: texto, genero: texto, duracaoMinutos: { type: 'number', exclusiveMinimum: 0, maximum: 100_000 },
     orcamentoCentavos: dinheiro, inicio: data, prazo: data, tipoCaptacao, localizacao: texto,
     estrategia: { type: 'string', enum: ESTRATEGIAS }, parametros: parametrosSchema,
+    tipoProjeto: { type: 'string', pattern: '^[a-z][a-z0-9-]{0,39}$' },
     papeis: { type: 'array', minItems: 1, maxItems: 6, items: {
       type: 'object', additionalProperties: false, required: ['papel', 'peso', 'competencias'],
       properties: { papel, peso: { type: 'number', exclusiveMinimum: 0, maximum: 1_000 }, competencias },
     } },
   },
 };
+export const especificacoesSchema = {
+  type: 'object', additionalProperties: false, properties: {
+    reservaOrcamentoCentavos: dinheiro,
+    tema: texto, entrevistados: { type: 'array', maxItems: 100, uniqueItems: true, items: texto }, autorizacoesConfirmadas: { type: 'boolean' },
+    tecnica: { type: 'string', enum: ['2d', '3d'] }, software: texto,
+    framesPorSegundo: { type: 'integer', minimum: 1, maximum: 120 },
+    tempoRenderPorFrameSegundos: { type: 'number', exclusiveMinimum: 0, maximum: 86400 },
+    horasRenderDisponiveis: { type: 'number', exclusiveMinimum: 0, maximum: 100000 },
+    cliente: texto, produto: texto, publicoAlvo: texto, canais: { type: 'array', maxItems: 20, uniqueItems: true, items: texto },
+    duracaoMaximaSegundos: { type: 'number', exclusiveMinimum: 0, maximum: 36000 },
+  },
+};
+export const projetoFamiliaSchema = { ...projetoSchema, properties: { ...projetoSchema.properties, especificacoes: especificacoesSchema } };
+const { tipoProjeto: _tipoProjeto, ...propriedadesAjustaveis } = projetoFamiliaSchema.properties;
+export const ajustesSchema = { type: 'object', additionalProperties: false, properties: propriedadesAjustaveis };
+export const modeloParams = { type: 'object', required: ['nome'], properties: { nome: { type: 'string', pattern: '^[a-z][a-z0-9-]{0,39}$' } } };
 export const profissionalSchema = {
   type: 'object', additionalProperties: false,
   required: ['nome', 'email', 'papeis', 'competencias', 'precoCentavos', 'disponibilidade', 'localizacao', 'historico', 'avaliacoes'],
@@ -61,4 +78,5 @@ export const respostaSchema = { type: 'object', additionalProperties: false, req
 } };
 export const reavaliarSchema = { type: 'object', additionalProperties: false, properties: {
   orcamentoCentavos: dinheiro, inicio: data, prazo: data, estrategia: { type: 'string', enum: ESTRATEGIAS }, parametros: parametrosSchema,
+  especificacoes: especificacoesSchema,
 } };

@@ -69,7 +69,27 @@ Use `RECUSADO` para recusar. A recusa dispara recomendação somente para o pape
 {"orcamentoCentavos":300000,"prazo":"2027-03-25","estrategia":"orcamento"}
 ```
 
-Permite alterar orçamento, início, prazo, estratégia e parâmetros. `{}` também solicita uma nova avaliação com os mesmos critérios. Cancela os convites ativos e exige novo consenso sobre a equipe sugerida.
+Permite alterar orçamento, início, prazo, estratégia, parâmetros e `especificacoes`. As especificações informadas são mescladas com as existentes e novamente validadas. `{}` também solicita uma nova avaliação com os mesmos critérios. Cancela os convites ativos e exige novo consenso sobre a equipe sugerida.
+
+## Famílias e modelos (ATVII)
+
+`POST /projetos` aceita `tipoProjeto`: `padrao`, `documentario`, `animacao` ou `publicitario`. Omitir o campo mantém o comportamento da ATVI. Exemplos completos estão em `examples/projeto-documentario.json`, `examples/projeto-animacao.json` e `examples/projeto-publicitario.json`.
+
+`especificacoes` reúne os campos específicos da família. Valores monetários são centavos; a duração do projeto é em minutos, enquanto o limite do briefing é em segundos. A reserva de produção é descontada antes de montar a equipe. As regras estão em [atv2.md](atv2.md).
+
+`GET /prototipos` lista `{nome, dados}` dos modelos disponíveis.
+
+`POST /projetos/modelos/:nome` recebe apenas os ajustes desejados, por exemplo:
+
+```json
+{"titulo":"Curta em animação","especificacoes":{"software":"Blender","horasRenderDisponiveis":80}}
+```
+
+Com `nome=animacao`, retorna 201 e um novo projeto recomendado. Para documentário, forneça também `entrevistados` e `autorizacoesConfirmadas: true` nas especificações. Um modelo não é alterado por essa operação. Modelo desconhecido retorna 404.
+
+`POST /projetos/:id/clonar` recebe `{}` ou ajustes como título, orçamento, papéis e especificações. Retorna 201, com nova identidade, equipe recalculada e sem convites anteriores. Não altera a origem. Não permite trocar `tipoProjeto` ou fornecer `id` nos ajustes. As novas especificações são mescladas; arrays informados substituem integralmente os anteriores.
+
+As três famílias possuem relatórios e notificações internas específicos nas mesmas rotas de leitura. Tipo não registrado ou regra específica violada retorna 422. Campo desconhecido retorna 400.
 
 ## Estados e leitura
 

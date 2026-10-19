@@ -58,8 +58,9 @@ package "Infraestrutura e observadores" {
 API_Fastify --> ServicoEquipes
 ServicoEquipes --> Repositorio
 ServicoEquipes --> CatalogoProfissionais
-ServicoEquipes --> CacheRecomendacoes
-ServicoEquipes --> OrquestradorPadrao
+ServicoEquipes --> SistemaRecomendacao
+SistemaRecomendacao --> CacheRecomendacoes
+SistemaRecomendacao --> OrquestradorPadrao
 CacheRecomendacoes --> OrquestradorPadrao
 RepositorioPostgres ..|> Repositorio
 RepositorioPostgres --> PostgreSQL : TypeORM / transações
@@ -99,4 +100,77 @@ note bottom of OrquestradorEquipe
   orquestrar é concreto e não sobrescrevível.
   As etapas protegidas variam nas subclasses.
 end note
+
+package "Criação (ATVII)" {
+  interface FabricaProjeto {
+    +criarProjeto(dados)
+    +criarValidador(equipe)
+    +criarRecomendador(projeto)
+    +criarNotificador(destino)
+    +criarRelatorio(equipe, profissionais)
+  }
+  class FabricaPadrao
+  class FabricaDocumentario
+  class FabricaAnimacao
+  class FabricaPublicitario
+  class RegistroFabricas
+  class RegistroPrototipos
+}
+class Projeto {
+  +clonar(): this
+  +criarFabrica(): FabricaProjeto
+}
+class ProjetoDocumentario
+class ProjetoAnimacao
+class ProjetoPublicitario
+FabricaPadrao ..|> FabricaProjeto
+RegistroPrototipos o-- Projeto : guarda e clona
+RegistroFabricas o-- FabricaProjeto
+OrquestradorEquipe --> FabricaProjeto : injetada no construtor
+SistemaRecomendacao --> RegistroFabricas
+SistemaRecomendacao --> RegistroPrototipos
+note right of RegistroPrototipos
+  Prototype: cópia profunda preserva a classe.
+  API cria outra identidade e recalcula a equipe.
+end note
+
+FabricaDocumentario --|> FabricaPadrao
+ProjetoDocumentario --|> Projeto
+ProjetoDocumentario ..> FabricaDocumentario : Factory Method
+FabricaDocumentario ..> ProjetoDocumentario : cria
+FabricaDocumentario ..> ValidadorDocumentario : cria
+FabricaDocumentario ..> RecomendadorDocumentario : cria
+FabricaDocumentario ..> NotificadorDocumentario : cria
+FabricaDocumentario ..> RelatorioDocumentario : cria
+ValidadorDocumentario ..|> VisitanteProjeto
+RelatorioDocumentario ..|> VisitanteProjeto
+RecomendadorDocumentario ..|> RecomendacaoStrategy
+NotificadorDocumentario ..|> Observador
+
+FabricaAnimacao --|> FabricaPadrao
+ProjetoAnimacao --|> Projeto
+ProjetoAnimacao ..> FabricaAnimacao : Factory Method
+FabricaAnimacao ..> ProjetoAnimacao : cria
+FabricaAnimacao ..> ValidadorAnimacao : cria
+FabricaAnimacao ..> RecomendadorAnimacao : cria
+FabricaAnimacao ..> NotificadorAnimacao : cria
+FabricaAnimacao ..> RelatorioAnimacao : cria
+ValidadorAnimacao ..|> VisitanteProjeto
+RelatorioAnimacao ..|> VisitanteProjeto
+RecomendadorAnimacao ..|> RecomendacaoStrategy
+NotificadorAnimacao ..|> Observador
+
+FabricaPublicitario --|> FabricaPadrao
+ProjetoPublicitario --|> Projeto
+ProjetoPublicitario ..> FabricaPublicitario : Factory Method
+FabricaPublicitario ..> ProjetoPublicitario : cria
+FabricaPublicitario ..> ValidadorPublicitario : cria
+FabricaPublicitario ..> RecomendadorPublicitario : cria
+FabricaPublicitario ..> NotificadorPublicitario : cria
+FabricaPublicitario ..> RelatorioPublicitario : cria
+ValidadorPublicitario ..|> VisitanteProjeto
+RelatorioPublicitario ..|> VisitanteProjeto
+RecomendadorPublicitario ..|> RecomendacaoStrategy
+NotificadorPublicitario ..|> Observador
+
 @enduml

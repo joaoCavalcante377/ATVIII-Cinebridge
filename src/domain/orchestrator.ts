@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { ErroDominio } from './types.ts';
 import type { Equipe, MembroEquipe, Papel, ProfissionalDados, ProjetoDados, Ranking } from './types.ts';
-import { Projeto, Profissional } from './model.ts';
+import { Profissional } from './model.ts';
 import { ValidadorConsistencia, elegivel } from './visitors.ts';
-import { criarEstrategia } from './strategies.ts';
+import type { FabricaProjeto } from './factory-contracts.ts';
+import { FabricaPadrao } from './project-factories.ts';
 import { alocar } from './allocation.ts';
 
 export interface OpcoesOrquestracao { fixos?: MembroEquipe[]; excluidos?: Partial<Record<Papel, string[]>>; cadastroIndisponivel?: boolean }
@@ -12,17 +13,21 @@ type Fluxo = (projeto: ProjetoDados, profissionais: ProfissionalDados[], opcoes?
 
 export abstract class OrquestradorEquipe {
   readonly orquestrar!: Fluxo;
-  constructor() {
+  protected readonly fabrica: FabricaProjeto;
+  constructor(fabrica: FabricaProjeto = new FabricaPadrao()) {
+    this.fabrica = fabrica;
     // TypeScript não tem métodos final. Uma propriedade própria não gravável
     // mantém a ordem do template, mesmo diante de atribuições em runtime.
     Object.defineProperty(this, 'orquestrar', { configurable: false, writable: false, value: (projeto: ProjetoDados, profissionais: ProfissionalDados[], opcoes: OpcoesOrquestracao = {}): ResultadoOrquestracao => {
       this.validarRestricoes(projeto);
+      const entidade = this.fabrica.criarProjeto(projeto);
+      projeto = { ...entidade.dados, orcamentoCentavos: entidade.orcamentoEquipe() };
       const { profissionais: validos, avisos } = this.normalizarDados(projeto, profissionais);
       const fixos = opcoes.fixos ?? [];
       this.validarFixos(projeto, validos, fixos, opcoes.excluidos ?? {}, opcoes.cadastroIndisponivel ?? false);
       if (opcoes.cadastroIndisponivel && fixos.some(f => !validos.some(p => p.id === f.profissionalId))) avisos.push('Escolhas fixas preservadas; disponibilidade não pôde ser revalidada porque o cadastro está indisponível.');
       const idsFixos = new Set(fixos.map(f => f.profissionalId));
-      const recomendacoes = criarEstrategia(projeto).recomendar(projeto, validos.filter(p => !idsFixos.has(p.id)));
+      const recomendacoes = this.fabrica.criarRecomendador(projeto).recomendar(projeto, validos.filter(p => !idsFixos.has(p.id)));
       for (const requisito of projeto.papeis) recomendacoes[requisito.papel] = (recomendacoes[requisito.papel] ?? []).filter(c => !(opcoes.excluidos?.[requisito.papel] ?? []).includes(c.profissionalId));
       return this.posProcessar(projeto, recomendacoes, fixos, avisos);
     } });
@@ -45,7 +50,7 @@ export abstract class OrquestradorEquipe {
 
 export class OrquestradorPadrao extends OrquestradorEquipe {
   protected validarRestricoes(projeto: ProjetoDados): void {
-    const erros = new Projeto(projeto).aceitar(new ValidadorConsistencia());
+    const erros = this.fabrica.criarProjeto(projeto).aceitar(this.fabrica.criarValidador());
     if (erros.length) throw new ErroDominio(erros.join(' '));
   }
   protected normalizarDados(_projeto: ProjetoDados, profissionais: ProfissionalDados[]): { profissionais: ProfissionalDados[]; avisos: string[] } {

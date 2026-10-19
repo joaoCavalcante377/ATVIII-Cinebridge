@@ -18,10 +18,19 @@ export interface Parametros {
 export const PARAMETROS_PADRAO: Parametros = {
   pesoCompetencia: 0.65, pesoAvaliacao: 0.25, pesoPreco: 0.1, limiteCandidatos: 10,
 };
+export interface EspecificacoesProjeto {
+  reservaOrcamentoCentavos?: number;
+  tema?: string; entrevistados?: string[]; autorizacoesConfirmadas?: boolean;
+  tecnica?: '2d' | '3d'; software?: string; framesPorSegundo?: number;
+  tempoRenderPorFrameSegundos?: number; horasRenderDisponiveis?: number;
+  cliente?: string; produto?: string; publicoAlvo?: string; canais?: string[];
+  duracaoMaximaSegundos?: number;
+}
 export interface ProjetoDados {
   id: string; titulo: string; genero: string; duracaoMinutos: number; orcamentoCentavos: number;
   inicio: string; prazo: string; tipoCaptacao: TipoCaptacao; localizacao: string;
   papeis: RequisitoPapel[]; estrategia: Estrategia; parametros: Parametros;
+  tipoProjeto?: string; especificacoes?: EspecificacoesProjeto;
 }
 export interface Candidato {
   profissionalId: string; nome: string; precoCentavos: number; pontuacao: number; motivos: string[];

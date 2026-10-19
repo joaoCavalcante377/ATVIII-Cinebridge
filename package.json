@@ -1,6 +1,6 @@
 {
   "name": "cinebridge",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "description": "Recomendação e formação de equipes audiovisuais",
@@ -18,7 +18,8 @@
     "db:seed": "node --env-file-if-exists=.env scripts/seed.ts",
     "demo": "node scripts/demo.ts",
     "test:load": "node --env-file-if-exists=.env scripts/load.ts",
-    "evaluate": "node scripts/evaluate.ts"
+    "evaluate": "node scripts/evaluate.ts",
+    "demo:familias": "node scripts/demo-families.ts"
   },
   "dependencies": {
     "fastify": "^5.6.0",

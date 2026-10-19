@@ -41,3 +41,7 @@ Depois, até oito objetivos com penalidades diferentes de custo procuram melhora
 Execute `npm run evaluate`. O script calcula `precision@3` para as três estratégias, usando uma lista explícita de profissionais relevantes de uma **fixture sintética**. Os rótulos não são derivados automaticamente da pontuação. O exemplo serve para conferir o cálculo e tornar diferenças observáveis; não permite afirmar que o sistema tem a mesma precisão no mundo real.
 
 Para medir qualidade real, seriam necessários projetos históricos com escolhas avaliadas, divisão temporal entre dados do modelo e dados de teste, rótulos revisados e comparação com uma base simples. Esse conjunto não foi fornecido. Notas do trabalho avaliam a atuação do profissional, não preferências individuais de espectadores.
+
+## Famílias da ATVII
+
+Os recomendadores específicos combinam 60% da pontuação da estratégia original com 40% da adequação às competências da família. A reserva de produção é descontada do orçamento antes da alocação. As regras e a fórmula de renderização estão em [atv2.md](atv2.md). A família padrão mantém o cálculo da ATVI.

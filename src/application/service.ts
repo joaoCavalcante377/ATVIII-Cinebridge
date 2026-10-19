@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { ErroDominio, PARAMETROS_PADRAO } from '../domain/types.ts';
-import type { EstadoProjeto, Evento, MembroEquipe, Papel, Parametros, ProfissionalDados, ProjetoDados } from '../domain/types.ts';
-import { OrquestradorPadrao } from '../domain/index.ts';
+import type { EstadoProjeto, Evento, Papel, Parametros, ProjetoDados } from '../domain/types.ts';
+import { SistemaRecomendacao } from './recommendation-system.ts';
 import type { Repositorio } from './ports.ts';
 import { CatalogoProfissionais } from './catalog.ts';
-import { CacheRecomendacoes } from './recommendation-cache.ts';
 
 export type NovoProjeto = Omit<ProjetoDados, 'id' | 'parametros'> & { parametros?: Partial<Parametros> };
-export type AlteracaoProjeto = Partial<Pick<ProjetoDados, 'orcamentoCentavos' | 'inicio' | 'prazo' | 'estrategia'>> & { parametros?: Partial<Parametros> };
+export type AjustesProjeto = Partial<Omit<NovoProjeto, 'tipoProjeto'>>;
+export type AlteracaoProjeto = Partial<Pick<ProjetoDados, 'orcamentoCentavos' | 'inicio' | 'prazo' | 'estrategia' | 'especificacoes'>> & { parametros?: Partial<Parametros> };
 
 export function criarEvento(tipo: string, projetoId: string, dados: Record<string, unknown>): Evento {
   return { id: randomUUID(), tipo, projetoId, dados, ocorridoEm: new Date().toISOString() };
@@ -16,18 +16,16 @@ export function criarEvento(tipo: string, projetoId: string, dados: Record<strin
 export class ServicoEquipes {
   private repositorio: Repositorio;
   private catalogo: CatalogoProfissionais;
-  private orquestrador: OrquestradorPadrao;
-  private recomendacoes: CacheRecomendacoes;
+  readonly sistema: SistemaRecomendacao;
 
-  constructor(repositorio: Repositorio, catalogo: CatalogoProfissionais, orquestrador = new OrquestradorPadrao()) {
-    this.repositorio = repositorio; this.catalogo = catalogo; this.orquestrador = orquestrador;
-    this.recomendacoes = new CacheRecomendacoes(orquestrador);
+  constructor(repositorio: Repositorio, catalogo: CatalogoProfissionais, sistema = new SistemaRecomendacao()) {
+    this.repositorio = repositorio; this.catalogo = catalogo; this.sistema = sistema;
   }
 
   async criar(entrada: NovoProjeto): Promise<EstadoProjeto> {
-    const projeto: ProjetoDados = { ...entrada, id: randomUUID(), parametros: { ...PARAMETROS_PADRAO, ...entrada.parametros } };
+    const projeto = this.sistema.criarProjeto({ ...entrada, id: randomUUID(), parametros: { ...PARAMETROS_PADRAO, ...entrada.parametros } }).dados;
     const dados = await this.catalogo.consultar();
-    const resultado = this.recomendacoes.recomendar(projeto, dados.profissionais);
+    const resultado = this.sistema.recomendar(projeto, dados.profissionais);
     const estado: EstadoProjeto = {
       projeto, equipe: resultado.equipe, versao: 1, convites: [], excluidos: {},
       recomendacao: {
@@ -36,13 +34,35 @@ export class ServicoEquipes {
         avisos: [...dados.avisos, ...resultado.avisos], criadaEm: new Date().toISOString(),
       },
     };
-    return this.repositorio.criarEstado({ estado, eventos: [this.eventoRecomendacao(estado)] });
+    return this.repositorio.criarEstado(this.mudanca(estado, [this.eventoRecomendacao(estado)]));
   }
 
   async buscar(id: string): Promise<EstadoProjeto> {
     const estado = await this.repositorio.buscarEstado(id);
     if (!estado) throw new ErroDominio('Projeto não encontrado', 404);
     return estado;
+  }
+
+  async criarDeModelo(nome: string, ajustes: AjustesProjeto): Promise<EstadoProjeto> {
+    const copia = this.sistema.prototipos.clonar(nome);
+    const projeto = copia.criarFabrica().criarProjeto({ ...ajustes,
+      parametros: { ...copia.dados.parametros, ...ajustes.parametros } });
+    return this.criar(projeto.dados);
+  }
+
+  async clonar(id: string, ajustes: AjustesProjeto): Promise<EstadoProjeto> {
+    const origem = await this.buscar(id);
+    const copia = this.sistema.criarProjeto(origem.projeto).clonar();
+    const projeto = copia.criarFabrica().criarProjeto({ ...ajustes,
+      parametros: { ...copia.dados.parametros, ...ajustes.parametros } });
+    // Somente os dados configuráveis são reaproveitados. Convites, equipe e aceites são novos.
+    return this.criar(projeto.dados);
+  }
+
+  private mudanca(estado: EstadoProjeto, eventos: Evento[]) {
+    for (const evento of eventos) evento.dados = { ...evento.dados,
+      tipoProjeto: estado.projeto.tipoProjeto ?? 'padrao', especificacoes: estado.projeto.especificacoes ?? {} };
+    return { estado, eventos };
   }
 
   private eventoRecomendacao(estado: EstadoProjeto, papel?: Papel): Evento {
@@ -76,7 +96,7 @@ export class ServicoEquipes {
     const profissionais = profissionalId
       ? dados.profissionais.filter(p => p.id === profissionalId || fixos.some(m => m.profissionalId === p.id))
       : dados.profissionais;
-    const resultado = this.orquestrador.orquestrar(estado.projeto, profissionais, { fixos, excluidos: estado.excluidos, cadastroIndisponivel: dados.degradada });
+    const resultado = this.sistema.recomendar(estado.projeto, profissionais, { fixos, excluidos: estado.excluidos, cadastroIndisponivel: dados.degradada });
     if (profissionalId && !resultado.equipe.membros.some(m => m.papel === papel && m.profissionalId === profissionalId)) {
       throw new ErroDominio('O profissional não atende ao papel, disponibilidade, localização ou orçamento');
     }
@@ -97,7 +117,7 @@ export class ServicoEquipes {
       const escolhidos = papeis ?? estado.equipe.membros.map(m => m.papel);
       if (!escolhidos.length) throw new ErroDominio('Não há membros para convidar');
       // Revalida restrições com os integrantes fixos antes de emitir qualquer convite.
-      this.orquestrador.orquestrar(estado.projeto, dados.profissionais, { fixos: estado.equipe.membros });
+      this.sistema.recomendar(estado.projeto, dados.profissionais, { fixos: estado.equipe.membros });
       const eventos: Evento[] = [];
       for (const papel of escolhidos) {
         const membro = estado.equipe.membros.find(m => m.papel === papel);
@@ -109,7 +129,7 @@ export class ServicoEquipes {
         eventos.push(criarEvento('convite.criado', id, { conviteId: convite.id, papel, profissionalId: membro.profissionalId, destinatarios: [`profissional:${membro.profissionalId}`] }));
       }
       this.atualizarStatus(estado);
-      return { estado, eventos };
+      return this.mudanca(estado, eventos);
     });
   }
 
@@ -123,7 +143,7 @@ export class ServicoEquipes {
       if (atual) estado.excluidos[papel] = [...new Set([...(estado.excluidos[papel] ?? []), atual.profissionalId])];
       await this.recalcular(estado, papel, profissionalId);
       eventos.push(criarEvento('membro.substituido', id, { papel, anterior: atual?.profissionalId, solicitado: profissionalId, destinatarios: [`produtor:${id}`] }), this.eventoRecomendacao(estado, papel));
-      return { estado, eventos };
+      return this.mudanca(estado, eventos);
     });
   }
 
@@ -150,7 +170,7 @@ export class ServicoEquipes {
           destinatarios: [`produtor:${id}`, ...estado.equipe.membros.map(m => `profissional:${m.profissionalId}`)],
         }));
       }
-      return { estado, eventos };
+      return this.mudanca(estado, eventos);
     });
   }
 
@@ -158,10 +178,11 @@ export class ServicoEquipes {
     return this.repositorio.alterarEstado(id, async estado => {
       const eventos = this.cancelarConvites(estado);
       if (estado.equipe.status === 'CONFIRMADA') eventos.push(criarEvento('equipe.reaberta', id, { destinatarios: [`produtor:${id}`] }));
-      estado.projeto = { ...estado.projeto, ...alteracao, parametros: { ...estado.projeto.parametros, ...alteracao.parametros } };
+      estado.projeto = { ...estado.projeto, ...alteracao, parametros: { ...estado.projeto.parametros, ...alteracao.parametros },
+        ...(alteracao.especificacoes ? { especificacoes: { ...estado.projeto.especificacoes, ...alteracao.especificacoes } } : {}) };
       await this.recalcular(estado);
       eventos.push(criarEvento('projeto.reavaliado', id, { alteracao, destinatarios: [`produtor:${id}`] }), this.eventoRecomendacao(estado));
-      return { estado, eventos };
+      return this.mudanca(estado, eventos);
     });
   }
 }

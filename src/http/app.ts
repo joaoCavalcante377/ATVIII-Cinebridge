@@ -2,26 +2,28 @@ import Fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { ErroDominio } from '../domain/types.ts';
 import type { Papel, ProfissionalDados } from '../domain/types.ts';
-import { Projeto, Profissional, ValidadorConsistencia, CalculadorCompatibilidade, GeradorRelatorio } from '../domain/index.ts';
+import { Profissional, ValidadorConsistencia, CalculadorCompatibilidade } from '../domain/index.ts';
 import type { Repositorio } from '../application/ports.ts';
 import { ServicoEquipes } from '../application/service.ts';
-import type { NovoProjeto, AlteracaoProjeto } from '../application/service.ts';
+import type { NovoProjeto, AlteracaoProjeto, AjustesProjeto } from '../application/service.ts';
+import { SistemaRecomendacao } from '../application/recommendation-system.ts';
 import { CatalogoProfissionais } from '../application/catalog.ts';
-import { NotificadorEmail, NotificadorInterno, AuditoriaRecomendacao } from '../application/observers.ts';
+import { NotificadorEmail, AuditoriaRecomendacao } from '../application/observers.ts';
 import { BusEventos } from '../infrastructure/event-bus.ts';
 import { ProcessadorEventos } from '../infrastructure/worker.ts';
 import * as schemas from './schemas.ts';
 
-export function criarApp(repositorio: Repositorio, opcoes: { logger?: boolean; worker?: boolean; catalogo?: CatalogoProfissionais } = {}) {
+export function criarApp(repositorio: Repositorio, opcoes: { logger?: boolean; worker?: boolean; catalogo?: CatalogoProfissionais; sistema?: SistemaRecomendacao } = {}) {
   const app = Fastify({
     logger: opcoes.logger ?? true, bodyLimit: 256 * 1024,
     ajv: { customOptions: { removeAdditional: false, coerceTypes: false } },
   });
   const catalogo = opcoes.catalogo ?? new CatalogoProfissionais(() => repositorio.listarProfissionais());
-  const servico = new ServicoEquipes(repositorio, catalogo);
+  const sistema = opcoes.sistema ?? new SistemaRecomendacao();
+  const servico = new ServicoEquipes(repositorio, catalogo, sistema);
   const bus = new BusEventos({ timeoutMs: 2_000, tentativas: 2, onError: falha => { app.log.error(falha, 'Falha em observador'); } });
   bus.assinar(new NotificadorEmail(repositorio));
-  bus.assinar(new NotificadorInterno(repositorio));
+  bus.assinar(sistema.criarObservador(repositorio));
   bus.assinar(new AuditoriaRecomendacao(repositorio));
   const worker = new ProcessadorEventos(repositorio, bus, erro => { app.log.error({ err: erro }, 'Falha ao processar eventos'); });
   if (opcoes.worker !== false) app.addHook('onReady', async () => { worker.iniciar(); });
@@ -57,9 +59,16 @@ export function criarApp(repositorio: Repositorio, opcoes: { logger?: boolean; w
     request.log.info({ acao: 'profissional.cadastrado', profissionalId: profissional.id }, 'Cadastro concluído');
     return reply.code(201).send(profissional);
   });
-  app.post<{ Body: NovoProjeto }>('/projetos', { schema: { body: schemas.projetoSchema } }, async (request, reply) => {
+  app.post<{ Body: NovoProjeto }>('/projetos', { schema: { body: schemas.projetoFamiliaSchema } }, async (request, reply) => {
     return reply.code(201).send(await servico.criar(request.body));
   });
+  app.get('/prototipos', async () => sistema.prototipos.listar());
+  app.post<{ Params: { nome: string }; Body: AjustesProjeto }>('/projetos/modelos/:nome',
+    { schema: { params: schemas.modeloParams, body: schemas.ajustesSchema } },
+    async (request, reply) => reply.code(201).send(await servico.criarDeModelo(request.params.nome, request.body)));
+  app.post<{ Params: { id: string }; Body: AjustesProjeto }>('/projetos/:id/clonar',
+    { schema: { params: schemas.idParams, body: schemas.ajustesSchema } },
+    async (request, reply) => reply.code(201).send(await servico.clonar(request.params.id, request.body)));
   app.get<{ Params: { id: string } }>('/projetos/:id', { schema: { params: schemas.idParams } }, async request => servico.buscar(request.params.id));
   app.post<{ Params: { id: string }; Body: { papeis?: Papel[] } }>('/projetos/:id/aceitar', { schema: { params: schemas.idParams, body: schemas.aceitarSchema } },
     async request => servico.aceitar(request.params.id, request.body.papeis));
@@ -80,10 +89,11 @@ export function criarApp(repositorio: Repositorio, opcoes: { logger?: boolean; w
   app.get<{ Params: { id: string } }>('/projetos/:id/relatorio', { schema: { params: schemas.idParams } }, async request => {
     const estado = await servico.buscar(request.params.id);
     const dados = await catalogo.consultar();
-    const projeto = new Projeto(estado.projeto);
+    const fabrica = sistema.fabricas.obter(estado.projeto.tipoProjeto);
+    const projeto = fabrica.criarProjeto(estado.projeto);
     return {
-      texto: projeto.aceitar(new GeradorRelatorio(estado.equipe, dados.profissionais)),
-      inconsistencias: projeto.aceitar(new ValidadorConsistencia(estado.equipe)),
+      texto: projeto.aceitar(fabrica.criarRelatorio(estado.equipe, dados.profissionais)),
+      inconsistencias: projeto.aceitar(fabrica.criarValidador(estado.equipe)),
       compatibilidade: projeto.aceitar(new CalculadorCompatibilidade(estado.projeto, dados.profissionais, estado.equipe)),
       degradada: dados.degradada, avisos: dados.avisos,
     };

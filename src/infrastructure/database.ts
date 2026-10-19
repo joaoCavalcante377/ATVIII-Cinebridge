@@ -9,9 +9,10 @@ import { AuditoriaEntity, AvaliacaoEntity, CompetenciaEntity, ConviteEntity, ENT
   EventoEntity, MembroEntity, NotificacaoEntity, ProfissionalEntity, ProjetoEntity, RecomendacaoEntity } from './entities.ts';
 import type { EventoRegistro, ProjetoRegistro } from './entities.ts';
 import { EstruturaInicial1790000000000, nomeTabela } from './migration.ts';
+import { FamiliasProjeto1792000000000 } from './migration-families.ts';
 
 export function criarDataSource(url: string): DataSource {
-  return new DataSource({ type: 'postgres', url, entities: ENTIDADES, migrations: [EstruturaInicial1790000000000],
+  return new DataSource({ type: 'postgres', url, entities: ENTIDADES, migrations: [EstruturaInicial1790000000000, FamiliasProjeto1792000000000],
     synchronize: false, migrationsRun: false, migrationsTableName: 'migracoes',
     extra: { max: 25, connectionTimeoutMillis: 5_000, idleTimeoutMillis: 30_000, statement_timeout: 5_000, query_timeout: 6_000 },
   });
@@ -59,6 +60,8 @@ export class RepositorioPostgres implements Repositorio {
     });
     if (!registro) return null;
     const { recomendacaoAtualId, excluidos, versao, ...projeto } = registro;
+    if (projeto.tipoProjeto == null) delete projeto.tipoProjeto;
+    if (projeto.especificacoes == null) delete projeto.especificacoes;
     const equipe = await manager.findOneByOrFail(EquipeEntity, { projetoId: id });
     const recomendacao = await manager.findOneByOrFail(RecomendacaoEntity, { id: recomendacaoAtualId });
     const convites = await manager.find(ConviteEntity, { where: { projetoId: id }, order: { criadoEm: 'ASC', id: 'ASC' } });
