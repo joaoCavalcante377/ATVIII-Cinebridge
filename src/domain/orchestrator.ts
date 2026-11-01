@@ -6,6 +6,17 @@ import { ValidadorConsistencia, elegivel } from './visitors.ts';
 import type { FabricaProjeto } from './factory-contracts.ts';
 import { FabricaPadrao } from './project-factories.ts';
 import { alocar } from './allocation.ts';
+import type { RecomendacaoStrategy } from './strategies.ts';
+
+// Cadastros são imutáveis no fluxo (uma nova leitura gera novos objetos). Validar cada objeto
+// uma única vez evita repetir milhares de validações idênticas a cada requisição.
+const validacoes = new WeakMap<ProfissionalDados, boolean>();
+const normalizacoes = new WeakMap<ProfissionalDados[], { profissionais: readonly ProfissionalDados[]; avisos: string[] }>();
+function profissionalValido(profissional: ProfissionalDados, validador: ValidadorConsistencia): boolean {
+  let valido = validacoes.get(profissional);
+  if (valido === undefined) { valido = new Profissional(profissional).aceitar(validador).length === 0; validacoes.set(profissional, valido); }
+  return valido;
+}
 
 export interface OpcoesOrquestracao { fixos?: MembroEquipe[]; excluidos?: Partial<Record<Papel, string[]>>; cadastroIndisponivel?: boolean }
 export interface ResultadoOrquestracao { equipe: Equipe; candidatos: Ranking; avisos: string[] }
@@ -14,8 +25,11 @@ type Fluxo = (projeto: ProjetoDados, profissionais: ProfissionalDados[], opcoes?
 export abstract class OrquestradorEquipe {
   readonly orquestrar!: Fluxo;
   protected readonly fabrica: FabricaProjeto;
-  constructor(fabrica: FabricaProjeto = new FabricaPadrao()) {
+  protected readonly recomendador: RecomendacaoStrategy | undefined;
+  /** Sem recomendador explícito, usa o da família; com ele, aceita uma estratégia decorada. */
+  constructor(fabrica: FabricaProjeto = new FabricaPadrao(), recomendador?: RecomendacaoStrategy) {
     this.fabrica = fabrica;
+    this.recomendador = recomendador;
     // TypeScript não tem métodos final. Uma propriedade própria não gravável
     // mantém a ordem do template, mesmo diante de atribuições em runtime.
     Object.defineProperty(this, 'orquestrar', { configurable: false, writable: false, value: (projeto: ProjetoDados, profissionais: ProfissionalDados[], opcoes: OpcoesOrquestracao = {}): ResultadoOrquestracao => {
@@ -27,7 +41,7 @@ export abstract class OrquestradorEquipe {
       this.validarFixos(projeto, validos, fixos, opcoes.excluidos ?? {}, opcoes.cadastroIndisponivel ?? false);
       if (opcoes.cadastroIndisponivel && fixos.some(f => !validos.some(p => p.id === f.profissionalId))) avisos.push('Escolhas fixas preservadas; disponibilidade não pôde ser revalidada porque o cadastro está indisponível.');
       const idsFixos = new Set(fixos.map(f => f.profissionalId));
-      const recomendacoes = this.fabrica.criarRecomendador(projeto).recomendar(projeto, validos.filter(p => !idsFixos.has(p.id)));
+      const recomendacoes = (this.recomendador ?? this.fabrica.criarRecomendador(projeto)).recomendar(projeto, idsFixos.size ? validos.filter(p => !idsFixos.has(p.id)) : validos);
       for (const requisito of projeto.papeis) recomendacoes[requisito.papel] = (recomendacoes[requisito.papel] ?? []).filter(c => !(opcoes.excluidos?.[requisito.papel] ?? []).includes(c.profissionalId));
       return this.posProcessar(projeto, recomendacoes, fixos, avisos);
     } });
@@ -38,7 +52,7 @@ export abstract class OrquestradorEquipe {
 
   private validarFixos(projeto: ProjetoDados, profissionais: ProfissionalDados[], fixos: MembroEquipe[], excluidos: Partial<Record<Papel, string[]>>, cadastroIndisponivel: boolean): void {
     if (new Set(fixos.map(f => f.papel)).size !== fixos.length || new Set(fixos.map(f => f.profissionalId)).size !== fixos.length) throw new ErroDominio('Membros fixos repetem papel ou profissional.');
-    const porId = new Map(profissionais.map(p => [p.id, p]));
+    const porId = new Map(fixos.length ? profissionais.map(p => [p.id, p]) : []);
     for (const fixo of fixos) {
       const requisito = projeto.papeis.find(r => r.papel === fixo.papel), profissional = porId.get(fixo.profissionalId);
       if (!requisito || (!profissional && !cadastroIndisponivel) || (profissional && !elegivel(profissional, projeto, requisito)) || excluidos[fixo.papel]?.includes(fixo.profissionalId)) throw new ErroDominio('Membro fixo não é elegível para o papel.');
@@ -54,15 +68,22 @@ export class OrquestradorPadrao extends OrquestradorEquipe {
     if (erros.length) throw new ErroDominio(erros.join(' '));
   }
   protected normalizarDados(_projeto: ProjetoDados, profissionais: ProfissionalDados[]): { profissionais: ProfissionalDados[]; avisos: string[] } {
+    // O catálogo entrega o mesmo array enquanto não é recarregado; a normalização só depende dele.
+    let normalizado = normalizacoes.get(profissionais);
+    if (!normalizado) { normalizado = OrquestradorPadrao.normalizar(profissionais); normalizacoes.set(profissionais, normalizado); }
+    // Array congelado: as etapas seguintes só leem ou criam novas listas.
+    return { profissionais: normalizado.profissionais as ProfissionalDados[], avisos: [...normalizado.avisos] };
+  }
+  private static normalizar(profissionais: ProfissionalDados[]): { profissionais: readonly ProfissionalDados[]; avisos: string[] } {
     const validador = new ValidadorConsistencia(), vistos = new Set<string>(), validos: ProfissionalDados[] = [];
     let descartados = 0;
     for (const profissional of profissionais) {
-      if (vistos.has(profissional.id) || new Profissional(profissional).aceitar(validador).length) { descartados++; continue; }
+      if (vistos.has(profissional.id) || !profissionalValido(profissional, validador)) { descartados++; continue; }
       vistos.add(profissional.id); validos.push(profissional);
     }
     // Ordenação estabiliza a amostra de vizinhos colaborativos e os desempates.
     validos.sort((a, b) => a.id.localeCompare(b.id));
-    return { profissionais: validos, avisos: descartados ? [`${descartados} cadastro(s) inválido(s) ou duplicado(s) ignorado(s).`] : [] };
+    return { profissionais: Object.freeze(validos) as ProfissionalDados[], avisos: descartados ? [`${descartados} cadastro(s) inválido(s) ou duplicado(s) ignorado(s).`] : [] };
   }
   protected posProcessar(projeto: ProjetoDados, recomendacoes: Ranking, fixos: MembroEquipe[], avisos: string[]): ResultadoOrquestracao {
     const { membros, papeisPendentes } = alocar(projeto, recomendacoes, fixos);

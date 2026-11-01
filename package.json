@@ -1,9 +1,9 @@
 {
   "name": "cinebridge",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
-  "description": "Recomendação e formação de equipes audiovisuais",
+  "description": "Recomendação e formação de equipes audiovisuais, com integrações externas, pacotes de serviços e decoradores",
   "engines": {
     "node": ">=24.12.0 <25"
   },
@@ -19,7 +19,9 @@
     "demo": "node scripts/demo.ts",
     "test:load": "node --env-file-if-exists=.env scripts/load.ts",
     "evaluate": "node scripts/evaluate.ts",
-    "demo:familias": "node scripts/demo-families.ts"
+    "demo:familias": "node scripts/demo-families.ts",
+    "demo:atv3": "node scripts/demo-atv3.ts",
+    "demo:atv3:http": "node scripts/demo-atv3-http.ts"
   },
   "dependencies": {
     "fastify": "^5.6.0",

@@ -1,6 +1,14 @@
-# ATVII — Cinebridge
+# ATVIII — Cinebridge
 
-API para recomendar profissionais e formar equipes de projetos audiovisuais. Continuação da [ATVI-Cinebridge](https://github.com/joaoCavalcante377/ATVI-Cinebridge), com suporte a documentários, animações e projetos publicitários.
+API para recomendar profissionais e formar equipes de projetos audiovisuais. Continuação da [ATVII-Cinebridge](https://github.com/joaoCavalcante377/ATVII-Cinebridge), que por sua vez continua a [ATVI-Cinebridge](https://github.com/joaoCavalcante377/ATVI-Cinebridge).
+
+A ATVIII analisa anti-padrões do código anterior e introduz três padrões estruturais:
+
+- **Adapter:** integração com armazenamento em nuvem (S3, Google Cloud, disco local), gateways de pagamento (Stripe, PagSeguro, PayPal) e fontes de profissionais (LinkedIn, Indeed, cadastro interno);
+- **Composite:** projetos descritos como hierarquias de pacotes e serviços, com custo, prazo e validação recursivos;
+- **Decorator:** cache, auditoria e compressão sobre a recomendação, combinados em tempo de execução.
+
+Análise e decisões: [docs/atv3.md](docs/atv3.md).
 
 O sistema considera competências, disponibilidade, localização e orçamento para sugerir uma equipe. O produtor pode aceitar as sugestões ou substituir integrantes, e cada profissional responde ao seu convite. A equipe só fica confirmada após os aceites necessários.
 
@@ -15,6 +23,7 @@ O sistema considera competências, disponibilidade, localização e orçamento p
 | PostgreSQL | Dados dos projetos, equipes, convites e eventos |
 | EventEmitter | Distribuição de eventos para os observadores |
 | node:test e c8 | Testes automatizados e cobertura |
+| node:zlib, node:fs | Compressão gzip e armazenamento local portável |
 
 A aplicação é um único serviço. O worker de eventos executa no mesmo processo da API. Não há interface gráfica ou menu interativo; os scripts de demonstração fazem requisições HTTP.
 
@@ -22,11 +31,13 @@ A aplicação é um único serviço. O worker de eventos executa no mesmo proces
 
 É necessário ter **Node.js 24.12 ou superior, dentro da versão 24**, npm e PostgreSQL. O arquivo Compose utiliza PostgreSQL 18.6; Docker com Compose é opcional para quem já tem o banco instalado.
 
+**Plataformas:** Windows 10 ou superior e Ubuntu 24.04.3 ou superior, incluindo distribuições derivadas. As dependências são JavaScript puro, sem compilação nativa, e os caminhos de arquivo são portáveis. No Ubuntu, o Node.js do repositório `apt` padrão é anterior à versão 24; instale a versão 24 pelo [instalador oficial](https://nodejs.org/pt/download) (nvm ou NodeSource). Validado em Windows 11 e Ubuntu 26.04; veja [docs/validacao.md](docs/validacao.md).
+
 ### 1. Clonar e instalar
 
 ```sh
-git clone https://github.com/joaoCavalcante377/ATVII-Cinebridge.git
-cd ATVII-Cinebridge
+git clone https://github.com/joaoCavalcante377/ATVIII-Cinebridge.git
+cd ATVIII-Cinebridge
 npm ci
 ```
 
@@ -51,6 +62,10 @@ DATABASE_URL=postgres://cinebridge:cinebridge@127.0.0.1:54329/cinebridge
 TEST_DATABASE_URL=postgres://cinebridge:cinebridge@127.0.0.1:54329/cinebridge_test
 HOST=127.0.0.1
 PORT=3000
+ARMAZENAMENTO=local
+ARMAZENAMENTO_DIR=.local/arquivos
+PAGAMENTO=stripe
+RECOMENDACAO_DECORADORES=cache,auditoria
 ```
 
 | Variável | Finalidade |
@@ -59,6 +74,11 @@ PORT=3000
 | `TEST_DATABASE_URL` | Conexão usada pelos testes de integração e carga |
 | `HOST` | Endereço de escuta da API; padrão `127.0.0.1` |
 | `PORT` | Porta HTTP; padrão `3000` |
+| `ARMAZENAMENTO` | `local` (disco, padrão), `s3` ou `gcs` (simulados em memória) |
+| `ARMAZENAMENTO_DIR` | Pasta dos arquivos no modo `local`; padrão `.local/arquivos` |
+| `ARMAZENAMENTO_BUCKET` | Bucket simulado de `s3`/`gcs`; padrão `cinebridge-midias` |
+| `PAGAMENTO` | Gateway simulado: `stripe` (padrão), `pagseguro` ou `paypal` |
+| `RECOMENDACAO_DECORADORES` | Pilha inicial, do mais interno ao mais externo; padrão `cache,auditoria`. Vazio desativa |
 
 As credenciais acima correspondem ao ambiente local do Compose. Se usar outra instalação, ajuste usuário, senha, host e porta nas URLs.
 
@@ -101,7 +121,7 @@ O schema é criado por migrações, não por sincronização automática do ORM.
 | `profissionais` | Cadastro, papéis, preço, disponibilidade e histórico |
 | `competencias` | Competências e níveis dos profissionais |
 | `avaliacoes` | Notas e comentários recebidos |
-| `projetos` | Critérios, família, especificações e versão do projeto |
+| `projetos` | Critérios, família, especificações, hierarquia de serviços, preferências e versão |
 | `equipes` | Equipe atual, custo, estado e papéis pendentes |
 | `membros_equipe` | Profissionais alocados e seus aceites |
 | `recomendacoes` | Histórico dos rankings e avisos |
@@ -112,7 +132,7 @@ O schema é criado por migrações, não por sincronização automática do ORM.
 
 O TypeORM também mantém a tabela de controle das migrações. Há chaves estrangeiras, restrições de unicidade e transações para manter os dados relacionados consistentes. Campos estruturados, como especificações e rankings, usam JSONB.
 
-**Banco da ATVI:** basta executar `npm run db:migrate`. A nova migração adiciona `tipoProjeto` e `especificacoes` sem apagar os registros existentes. Projetos antigos sem família explícita continuam usando o comportamento padrão.
+**Banco da ATVI ou da ATVII:** basta executar `npm run db:migrate`. As migrações adicionam `tipoProjeto` e `especificacoes` (ATVII) e `servicos` e `preferencias` (ATVIII), todas opcionais, sem apagar registros. Projetos antigos continuam usando o comportamento anterior.
 
 ## Rotas
 
@@ -135,6 +155,15 @@ URL base: `http://localhost:3000`. Envie os corpos como JSON, com `Content-Type:
 | GET | `/projetos/:id/relatorio` | Consultar relatório, inconsistências e compatibilidade |
 | GET | `/projetos/:id/notificacoes` | Consultar notificações registradas |
 | GET | `/projetos/:id/auditoria` | Consultar eventos auditados |
+| GET | `/projetos/:id/servicos` | Custo, prazo, validação e árvore de serviços (Composite) |
+| POST | `/projetos/:id/arquivos` | Anexar roteiro, storyboard ou amostra (Adapter) |
+| GET | `/projetos/:id/arquivos` | Listar arquivos do projeto |
+| GET | `/projetos/:id/arquivos/conteudo?arquivoId=` | Baixar um arquivo |
+| POST | `/projetos/:id/pagamentos` | Pagar a equipe confirmada (Adapter) |
+| GET | `/pagamentos/:transacaoId` | Consultar status de pagamento |
+| POST | `/profissionais/:id/avaliacoes` | Registrar avaliação pela fonte configurada (Adapter) |
+| GET | `/recomendador` | Política, provedores e métricas dos decoradores |
+| PUT | `/recomendador/politica` | Alterar a pilha de decoradores em execução (Decorator) |
 
 Não há rotas de listagem geral de projetos/profissionais, exclusão ou edição genérica. Guarde os IDs retornados nas criações.
 
@@ -184,6 +213,25 @@ Para criar diretamente por `POST /projetos`, use os exemplos completos:
 - [Documentário](examples/projeto-documentario.json)
 - [Animação](examples/projeto-animacao.json)
 - [Publicidade](examples/projeto-publicitario.json)
+- [Pacotes de serviços (ATVIII)](examples/projeto-servicos.json)
+
+### Projeto por pacotes de serviços — POST /projetos
+
+Em vez de `papeis`, envie `servicos` com a hierarquia. Os papéis da recomendação são derivados das folhas:
+
+```json
+{
+  "titulo": "Curta com pós-produção", "genero": "drama", "duracaoMinutos": 15, "orcamentoCentavos": 900000,
+  "inicio": "2027-03-01", "prazo": "2027-03-30", "tipoCaptacao": "ficcao", "localizacao": "São Paulo", "estrategia": "cosseno",
+  "preferencias": {"decoradores": ["cache", "auditoria"]},
+  "servicos": {"tipo": "pacote", "nome": "Pós-produção", "execucao": "paralela", "servicos": [
+    {"tipo": "atomico", "nome": "Edição", "custoCentavos": 40000, "prazoDias": 6, "papel": "EDITOR"},
+    {"tipo": "atomico", "nome": "Mixagem", "custoCentavos": 25000, "prazoDias": 5, "papel": "SONOPLASTA"}
+  ]}
+}
+```
+
+Pacotes `sequencial` somam os prazos; `paralela` usa o maior. Regras completas em [docs/api.md](docs/api.md#pacotes-de-serviços-atviii).
 
 ### Aceitar sugestões — POST /projetos/:id/aceitar
 
@@ -258,7 +306,7 @@ As alterações e seus eventos são persistidos na mesma transação. Após o co
 
 Por isso, notificações e auditoria podem aparecer depois da resposta HTTP da operação. O worker normalmente inicia uma nova rodada em até 200 ms. Eventos persistidos sobrevivem ao reinício da aplicação.
 
-O canal de e-mail é **um registro local**, sem envio SMTP. Não há autenticação, reserva global de agenda ou integração financeira externa. O `profissionalId` na resposta de convite verifica o destinatário, mas não autentica o usuário.
+O canal de e-mail é **um registro local**, sem envio SMTP. Os provedores de nuvem, pagamento e cadastro externo são **simulações** com o vocabulário de cada serviço, sem rede nem credenciais. Não há autenticação nem reserva global de agenda. O `profissionalId` na resposta de convite verifica o destinatário, mas não autentica o usuário.
 
 ## Respostas HTTP
 
@@ -270,9 +318,10 @@ O canal de e-mail é **um registro local**, sem envio SMTP. Não há autenticaç
 | 403 | Profissional informado não é o destinatário do convite |
 | 404 | Projeto, convite, modelo ou rota inexistente |
 | 409 | Conflito de registro ou convite já respondido/cancelado |
-| 413 | Corpo da requisição acima de 256 KiB |
+| 413 | Corpo da requisição acima de 256 KiB (36 MiB no envio de arquivos) |
 | 422 | Violação de regra de domínio ou integridade |
-| 503 | Banco indisponível ou cadastro indisponível para uma confirmação |
+| 502 | Provedor externo recusou a operação |
+| 503 | Banco, cadastro ou provedor externo indisponível |
 | 500 | Falha inesperada, registrada no log |
 
 Orçamento insuficiente para preencher todos os papéis pode gerar equipe parcial, em vez de erro. A API fornece os motivos no resultado.
@@ -288,13 +337,16 @@ Orçamento insuficiente para preencher todos os papéis pode gerar equipe parcia
 | Prototype | Clonagem profunda e registro de modelos |
 | Factory Method | Subclasses de projeto selecionam sua fábrica |
 | Abstract Factory | Criação dos componentes compatíveis de cada família |
+| Adapter | Interfaces de armazenamento, pagamento e profissionais, com três provedores cada |
+| Composite | `ServicoProjeto`, `ServicoAtomico` e `PacoteServico`; `Projeto.servicoPrincipal` |
+| Decorator | `CacheDecorator`, `AuditoriaDecorator` e `CompressaoDecorator` sobre `RecomendacaoStrategy` |
 
 ```text
 src/
   domain/          Entidades, regras, padrões e algoritmos
   application/     Casos de uso, catálogo e seleção de fábricas
   http/            Rotas e schemas de validação
-  infrastructure/  TypeORM, migrações, barramento e worker
+  infrastructure/  TypeORM, migrações, barramento, worker, sistemas externos simulados e adaptadores
 scripts/           Migrações, seed, demonstrações e avaliação
 test/              Testes de domínio, aplicação e integração
 examples/          Corpos JSON para criação de projetos
@@ -311,17 +363,19 @@ docs/              Análise, diagrama, API e resultados de validação
 | `npm run test:coverage` | Executar a suíte completa e gerar cobertura |
 | `npm run demo` | Demonstrar o fluxo da ATVI por HTTP |
 | `npm run demo:familias` | Demonstrar famílias, clones, relatórios e notificações |
+| `npm run demo:atv3` | Demonstrar Adapter, Composite e Decorator sem banco nem servidor |
+| `npm run demo:atv3:http` | Demonstrar serviços, arquivos, pagamentos e métricas por HTTP |
 | `npm run test:load` | Medir requisições concorrentes com PostgreSQL |
 | `npm run evaluate` | Calcular métricas sobre uma fixture sintética |
 
-Integração, cobertura e carga exigem `TEST_DATABASE_URL` e o PostgreSQL disponível. As demonstrações exigem a API em execução e os dados do seed. Rode-as em outro terminal. Se mudar a porta, configure a variável `BASE_URL` nesse terminal; no PowerShell:
+Integração, cobertura e carga exigem `TEST_DATABASE_URL` e o PostgreSQL disponível. As demonstrações HTTP exigem a API em execução e os dados do seed; `demo:atv3` roda sozinha. Rode-as em outro terminal. Se mudar a porta, configure a variável `BASE_URL` nesse terminal; no PowerShell:
 
 ```powershell
 $env:BASE_URL = "http://127.0.0.1:3001"
 npm run demo:familias
 ```
 
-Na revalidação de **18/10/2026**, os **93 testes passaram**, com **97,74% de cobertura de linhas**. O relatório HTML é gerado em `coverage/index.html`. Os resultados foram obtidos em Windows com PostgreSQL real; não houve execução de validação em Ubuntu. Detalhes e condições da medição: [docs/validacao.md](docs/validacao.md).
+Em **01/11/2026**, os **120 testes passaram** com PostgreSQL 18.6, no Ubuntu (WSL2) e no Windows 11 nativo, com **98,09% de cobertura de linhas**. O relatório HTML é gerado em `coverage/index.html`. Detalhes, carga e limites da medição: [docs/validacao.md](docs/validacao.md).
 
 ## Problemas comuns
 
@@ -334,6 +388,7 @@ Na revalidação de **18/10/2026**, os **93 testes passaram**, com **97,74% de c
 ## Documentação complementar
 
 - [Uso detalhado da API](docs/api.md)
+- [Análise de anti-padrões e implementação da ATVIII](docs/atv3.md)
 - [Análise e implementação da ATVII](docs/atv2.md)
 - [Algoritmos de recomendação](docs/algoritmos.md)
 - [Diagrama de classes em PlantUML](docs/diagrama.puml)

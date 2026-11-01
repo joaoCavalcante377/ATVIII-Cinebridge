@@ -26,11 +26,24 @@ export interface EspecificacoesProjeto {
   cliente?: string; produto?: string; publicoAlvo?: string; canais?: string[];
   duracaoMaximaSegundos?: number;
 }
+/** Forma serializada da hierarquia de serviços (Composite). */
+export interface ServicoAtomicoDados {
+  tipo: 'atomico'; nome: string; custoCentavos: number; prazoDias: number; papel: Papel;
+  peso?: number; competencias?: Competencia[];
+}
+export interface PacoteServicoDados {
+  tipo: 'pacote'; nome: string; execucao?: 'sequencial' | 'paralela'; prazoMaximoDias?: number;
+  servicos: ServicoDados[];
+}
+export type ServicoDados = ServicoAtomicoDados | PacoteServicoDados;
+/** Preferências do produtor que não alteram o resultado esperado do domínio. */
+export interface PreferenciasProjeto { decoradores?: string[] }
 export interface ProjetoDados {
   id: string; titulo: string; genero: string; duracaoMinutos: number; orcamentoCentavos: number;
   inicio: string; prazo: string; tipoCaptacao: TipoCaptacao; localizacao: string;
   papeis: RequisitoPapel[]; estrategia: Estrategia; parametros: Parametros;
   tipoProjeto?: string; especificacoes?: EspecificacoesProjeto;
+  servicos?: ServicoDados; preferencias?: PreferenciasProjeto;
 }
 export interface Candidato {
   profissionalId: string; nome: string; precoCentavos: number; pontuacao: number; motivos: string[];

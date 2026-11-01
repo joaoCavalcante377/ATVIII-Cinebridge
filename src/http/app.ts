@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { ErroDominio } from '../domain/types.ts';
-import type { Papel, ProfissionalDados } from '../domain/types.ts';
+import type { Avaliacao, Papel, ProfissionalDados } from '../domain/types.ts';
 import { Profissional, ValidadorConsistencia, CalculadorCompatibilidade } from '../domain/index.ts';
 import type { Repositorio } from '../application/ports.ts';
 import { ServicoEquipes } from '../application/service.ts';
@@ -11,6 +11,8 @@ import { CatalogoProfissionais } from '../application/catalog.ts';
 import { NotificadorEmail, AuditoriaRecomendacao } from '../application/observers.ts';
 import { BusEventos } from '../infrastructure/event-bus.ts';
 import { ProcessadorEventos } from '../infrastructure/worker.ts';
+import { AdaptadorInterno, AdaptadorS3, AdaptadorStripe } from '../infrastructure/adaptadores/configuracao.ts';
+import { ArmazenamentoExterno, GatewayPagamento } from '../infrastructure/sistemas-externos.ts';
 import * as schemas from './schemas.ts';
 
 export function criarApp(repositorio: Repositorio, opcoes: { logger?: boolean; worker?: boolean; catalogo?: CatalogoProfissionais; sistema?: SistemaRecomendacao } = {}) {
@@ -18,8 +20,11 @@ export function criarApp(repositorio: Repositorio, opcoes: { logger?: boolean; w
     logger: opcoes.logger ?? true, bodyLimit: 256 * 1024,
     ajv: { customOptions: { removeAdditional: false, coerceTypes: false } },
   });
-  const catalogo = opcoes.catalogo ?? new CatalogoProfissionais(() => repositorio.listarProfissionais());
   const sistema = opcoes.sistema ?? new SistemaRecomendacao();
+  // Sem configuração explícita: cadastro interno e provedores simulados em memória.
+  sistema.completarAdaptadores({ profissional: new AdaptadorInterno(repositorio),
+    armazenamento: new AdaptadorS3(new ArmazenamentoExterno('s3', 'cinebridge-midias')), pagamento: new AdaptadorStripe(new GatewayPagamento('stripe')) });
+  const catalogo = opcoes.catalogo ?? new CatalogoProfissionais(async () => (await sistema.profissional.listarProfissionais()).map(p => p.dados));
   const servico = new ServicoEquipes(repositorio, catalogo, sistema);
   const bus = new BusEventos({ timeoutMs: 2_000, tentativas: 2, onError: falha => { app.log.error(falha, 'Falha em observador'); } });
   bus.assinar(new NotificadorEmail(repositorio));
@@ -98,5 +103,35 @@ export function criarApp(repositorio: Repositorio, opcoes: { logger?: boolean; w
       degradada: dados.degradada, avisos: dados.avisos,
     };
   });
-  return { app, servico, catalogo, worker };
+  app.post<{ Params: { id: string }; Body: Avaliacao }>('/profissionais/:id/avaliacoes', { schema: { params: schemas.idParams, body: schemas.avaliacaoSchema } },
+    async (request, reply) => { await servico.avaliarProfissional(request.params.id, request.body); return reply.code(204).send(); });
+
+  // Composite
+  app.get<{ Params: { id: string } }>('/projetos/:id/servicos', { schema: { params: schemas.idParams } }, async request => servico.servicos(request.params.id));
+
+  // Adapter de armazenamento. O JSON em base64 aumenta o corpo em cerca de um terço.
+  app.post<{ Params: { id: string }; Body: { nome: string; tipo?: string; categoria?: string; conteudoBase64: string } }>('/projetos/:id/arquivos',
+    { bodyLimit: 36 * 1024 * 1024, schema: { params: schemas.idParams, body: schemas.arquivoSchema } }, async (request, reply) => {
+      const { conteudoBase64, ...metadados } = request.body;
+      return reply.code(201).send(await servico.anexarArquivo(request.params.id, Buffer.from(conteudoBase64, 'base64'), metadados));
+    });
+  app.get<{ Params: { id: string } }>('/projetos/:id/arquivos', { schema: { params: schemas.idParams } }, async request => servico.listarArquivos(request.params.id));
+  app.get<{ Params: { id: string }; Querystring: { arquivoId: string } }>('/projetos/:id/arquivos/conteudo',
+    { schema: { params: schemas.idParams, querystring: schemas.conteudoQuery } },
+    async (request, reply) => reply.type('application/octet-stream').send(await servico.recuperarArquivo(request.params.id, request.query.arquivoId)));
+
+  // Adapter de pagamento
+  app.post<{ Params: { id: string } }>('/projetos/:id/pagamentos', { schema: { params: schemas.idParams } }, async request => servico.pagar(request.params.id));
+  app.get<{ Params: { transacaoId: string } }>('/pagamentos/:transacaoId', { schema: { params: schemas.transacaoParams } },
+    async request => servico.verificarPagamento(request.params.transacaoId));
+
+  // Decorator: política da pilha em tempo de execução e métricas dos decoradores
+  app.get('/recomendador', async () => ({ politica: sistema.politicaDecoradores, disponiveis: sistema.decoradores.listar(),
+    adaptadores: sistema.adaptadoresConfigurados, metricas: sistema.monitor.metricas() }));
+  app.put<{ Body: { decoradores: string[] } }>('/recomendador/politica', { schema: { body: schemas.politicaSchema } }, async request => {
+    sistema.definirPoliticaDecoradores(request.body.decoradores);
+    request.log.info({ acao: 'politica.alterada', politica: request.body.decoradores }, 'Política de decoradores alterada');
+    return { politica: sistema.politicaDecoradores };
+  });
+  return { app, servico, catalogo, worker, sistema };
 }

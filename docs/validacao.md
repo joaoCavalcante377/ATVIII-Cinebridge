@@ -1,43 +1,56 @@
-# Validação da ATVII
+# Validação da ATVIII
 
-Execução em 17/10/2026, Windows, Node 24.14.0 e PostgreSQL 18.6 local.
+Execução em 01/11/2026, com PostgreSQL 18.6 local (mesma versão do `compose.yaml`) em dois ambientes:
 
-| Verificação | Resultado |
+| Ambiente | Sistema | Node |
+|---|---|---|
+| Linux | Ubuntu 26.04.1 LTS (WSL2, kernel 6.18) | 24.22.1 |
+| Windows | Windows 11, build 10.0.26200 (nativo, não WSL) | 24.14.0 |
+
+No Windows, o projeto foi instalado do zero (`npm ci`) em uma pasta do próprio Windows, e os testes de integração usaram o mesmo PostgreSQL pela rede local.
+
+| Verificação | Linux | Windows |
+|---|---|---|
+| `npm ci` | 195 pacotes, sem compilação nativa | 195 pacotes |
+| `npm run typecheck` | Sem erros com TypeScript estrito | Sem erros |
+| `npm test` (sem banco) | 92 aprovados | 92 aprovados |
+| `npm run test:coverage` (com PostgreSQL) | 120 aprovados, nenhum ignorado ou cancelado | 120 aprovados, nenhum ignorado ou cancelado |
+| Linhas e instruções | 98,09% | 98,09% |
+| Ramificações | 95,71% | 95,71% |
+| Funções | 98,46% | 98,46% |
+| `npm run demo:atv3` | Três padrões, sem banco | Inclui armazenamento em disco com caminhos do Windows |
+| `npm run db:migrate` | Três migrações, incluindo `ServicosProjeto1794000000000` | — |
+| `npm run db:seed` | 27 profissionais fictícios | — |
+| `npm run demo` e `npm run demo:familias` | Fluxos da ATVI e da ATVII por HTTP | — |
+| `npm run demo:atv3:http` | Hierarquia, confirmação, arquivo, pagamento idempotente e métricas por HTTP | — |
+| `npm run test:load` | 300 requisições, sem erros | — |
+
+Os 120 testes incluem os 92 da ATVII, menos o teste do cache removido, e 28 novos: 8 do Composite, 8 do Adapter, 8 do Decorator, 1 de HTTP e 3 de integração com PostgreSQL. A cobertura inclui todos os arquivos `src/**/*.ts`; `server.ts` aparece com 0% porque a inicialização real foi exercitada pelas demonstrações HTTP. Cobertura mede execução, não comprova ausência de defeitos. Dados brutos: [testes.txt](testes.txt) e [cobertura.json](cobertura.json).
+
+## O que os testes demonstram
+
+| Padrão | Verificação |
 |---|---|
-| npm run typecheck | Sem erros com TypeScript estrito |
-| npm run test:coverage | 93 testes aprovados, nenhum ignorado |
-| Linhas e instruções | 97,74% |
-| Ramificações | 97,98% |
-| Funções | 97,10% |
-| npm run db:migrate | Nova migração aplicada sobre o banco anterior |
-| npm run db:seed | 27 profissionais fictícios |
-| npm run demo | Recomendação, recusa, substituição e confirmação por HTTP |
-| npm run demo:familias | Três famílias, relatórios, notificações, clones e rejeição de renderização inviável |
-| npm run evaluate | Métrica sintética das três estratégias originais recalculada |
-| npm run test:load | 300 requisições HTTP, sem erros |
-
-Os 93 testes incluem os 77 da ATVI, nove testes de domínio sobre fábricas e sete de integração das famílias. Os testes de integração usam PostgreSQL real em schemas isolados. Há casos de clonagem sem referências compartilhadas, preservação de subtipo, mistura inválida de famílias, extensão com quarta família, migração reversível, rollback, reavaliação parcial e reentrega idempotente de eventos após reinício.
-
-O escopo de cobertura inclui todos os arquivos src/**/*.ts. server.ts aparece com 0% porque a inicialização real foi exercitada separadamente pelas demonstrações HTTP. Cobertura mede execução, não comprova ausência de defeitos. Dados brutos: [testes.txt](testes.txt) e [cobertura.json](cobertura.json).
-
-## Revalidação em 18/10/2026
-
-Tipagem, os 93 testes e as duas demonstrações HTTP foram executados novamente com sucesso. Nenhum teste foi ignorado ou cancelado na execução final. O PostgreSQL estava desligado no início; após iniciar o serviço e aguardar sua disponibilidade, a integração passou. Não foi necessária alteração no código da aplicação. Os dados de carga abaixo são da execução de 17/10/2026.
+| Adapter | O mesmo método de `ServicoEquipes` grava, lista e recupera arquivos em S3, Google Cloud e disco local, trocando apenas o adaptador injetado. A mesma equipe confirmada é paga por Stripe, PagSeguro e PayPal, com valor na unidade de cada gateway e repetição idempotente. LinkedIn, Indeed e o cadastro interno produzem a mesma equipe em `executarRecomendacao`. Também são verificadas a tradução de falhas (404/503), as escalas de nota, a recusa de identificadores de outro provedor e de travessia de diretórios. |
+| Composite | Custo e prazo em profundidades 1, 2, 4 e 8, em pacotes sequenciais e paralelos. A validação recursiva informa o caminho do nó. São recusados ciclos e instâncias repetidas. O projeto delega custo e prazo ao serviço principal, deriva os papéis e verifica prazo e orçamento. A hierarquia sobrevive à clonagem e à persistência em PostgreSQL. |
+| Decorator | O cache reduz o tempo de requisições repetidas: com 1.200 profissionais e estratégia colaborativa, o teste exige menos da metade do tempo sem cache, e o componente interno executa uma vez. A auditoria registra sucessos, falhas e durações. A compressão reduz o JSON e gera um gzip menor que um quinto do original, sem mudar candidatos nem ordem. Três ordens de pilha produzem o mesmo ranking, com efeitos diferentes e documentados. A pilha é escolhida por política ou preferência do produtor; o recomendador base nunca é alterado. |
 
 ## Carga
 
-Cadastro de 10 mil profissionais no PostgreSQL. Cada estratégia recebe 100 requisições simultâneas de criação por HTTP TCP. O cliente roda em outro processo Node e o worker de eventos permanece ativo. O catálogo e o cálculo começam frios em cada rodada. Os títulos variam, mas os critérios de recomendação são iguais dentro de cada rodada, permitindo uso do cache. O logger HTTP fica desabilitado nesta medição.
+Cadastro de 10 mil profissionais no PostgreSQL; 100 requisições simultâneas de criação por estratégia, por HTTP TCP, com o cliente em outro processo e o worker de eventos ativo. Linux, AMD Ryzen 5 3600, política padrão `cache,auditoria`.
 
 | Estratégia | p50 | p95 | Máximo | Erros |
 |---|---:|---:|---:|---:|
-| Cosseno | 925 ms | 993 ms | 994 ms | 0 |
-| Colaborativa | 907 ms | 966 ms | 967 ms | 0 |
-| Orçamento | 484 ms | 556 ms | 558 ms | 0 |
+| Cosseno | 1.039 ms | 1.094 ms | 1.096 ms | 0 |
+| Colaborativa | 1.129 ms | 1.179 ms | 1.182 ms | 0 |
+| Orçamento | 747 ms | 788 ms | 789 ms | 0 |
 
-O cliente valida resposta 201, seis membros diferentes, orçamento e ausência de degradação. O script falha se houver resposta inválida ou tempo máximo de dois segundos ou mais. Registro: [carga.json](carga.json). Esse teste reproduz o cenário da ATVI; não mede 100 combinações inéditas de critérios nem garante o mesmo desempenho em outra máquina.
+Na mesma máquina, a ATVII mediu 720, 826 e 453 ms. A diferença e as otimizações estão em [atv3.md](atv3.md#desempenho). Registro: [carga.json](carga.json). O teste reproduz o cenário da ATVI, com critérios iguais dentro de cada rodada; não mede combinações inéditas de critérios nem garante o mesmo desempenho em outra máquina.
 
 ## Limites
 
-A avaliação de precision@3 usa uma fixture pequena com rótulos sintéticos: 1,00 para cosseno, 0,67 para colaborativa e 0,00 para orçamento. Não representa qualidade em produção; os rótulos favorecem adequação técnica, não menor preço. Veja [avaliacao.json](avaliacao.json).
-
-A execução foi verificada em Windows; não foi executada em Ubuntu. Os scripts usam APIs Node e caminhos portáveis. E-mail é persistido localmente, sem provedor SMTP. Autenticação e reserva global da agenda dos profissionais não estão implementadas. As métricas de renderização são estimativas a partir dos dados fornecidos.
+- No Windows foram executados a instalação, a tipagem, todos os testes e a demonstração sem banco. Migração, seed, demonstrações HTTP e carga foram executados no Linux.
+- A validação em Linux foi feita no Ubuntu 26.04 (WSL2), não em uma instalação 24.04.3. O projeto não usa recursos posteriores ao Node 24.12 nem dependências nativas.
+- O PostgreSQL de validação é o binário oficial 18.6 executado como processo local, não o contêiner do `compose.yaml`; versão e configuração de acesso são as mesmas do `.env.example`.
+- Provedores de armazenamento, pagamento e cadastro externo são simulações; nenhum serviço real foi contatado.
+- A avaliação de precision@3 (`npm run evaluate`) foi recalculada e não mudou: 1,00 para cosseno, 0,67 para colaborativa e 0,00 para orçamento, sobre uma fixture sintética. Veja [avaliacao.json](avaliacao.json).

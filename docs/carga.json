@@ -1,11 +1,11 @@
 {
-  "data": "2026-10-18T02:36:14.578Z",
-  "node": "v24.14.0",
-  "postgres": "PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit",
-  "sistema": "win32 10.0.26200",
-  "cpu": "AMD Ryzen 5 3600 6-Core Processor              ",
+  "data": "2026-11-01T14:23:39.894Z",
+  "node": "v24.22.1",
+  "postgres": "PostgreSQL 18.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit",
+  "sistema": "linux 6.18.33.2-microsoft-standard-WSL2",
+  "cpu": "AMD Ryzen 5 3600 6-Core Processor",
   "processadoresLogicos": 12,
-  "memoriaGB": 16,
+  "memoriaGB": 8,
   "profissionais": 10000,
   "loggerHttp": false,
   "cenario": "100 POST concorrentes por estratégia; títulos diferentes e mesmos critérios. Cadastro e cálculo inicialmente frios; cache de critérios habilitado; PostgreSQL local real, HTTP TCP e cliente em processo separado; worker de eventos ativo.",
@@ -15,30 +15,30 @@
       "requisicoes": 100,
       "simultaneas": 100,
       "erros": 0,
-      "p50Ms": 925,
-      "p95Ms": 993,
-      "maxMs": 994,
-      "totalMs": 1047
+      "p50Ms": 1039,
+      "p95Ms": 1094,
+      "maxMs": 1096,
+      "totalMs": 1149
     },
     {
       "estrategia": "colaborativa",
       "requisicoes": 100,
       "simultaneas": 100,
       "erros": 0,
-      "p50Ms": 907,
-      "p95Ms": 966,
-      "maxMs": 967,
-      "totalMs": 1017
+      "p50Ms": 1129,
+      "p95Ms": 1179,
+      "maxMs": 1182,
+      "totalMs": 1233
     },
     {
       "estrategia": "orcamento",
       "requisicoes": 100,
       "simultaneas": 100,
       "erros": 0,
-      "p50Ms": 484,
-      "p95Ms": 556,
-      "maxMs": 558,
-      "totalMs": 613
+      "p50Ms": 747,
+      "p95Ms": 788,
+      "maxMs": 789,
+      "totalMs": 846
     }
   ],
   "aprovado": true,

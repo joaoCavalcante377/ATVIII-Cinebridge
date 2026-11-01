@@ -32,12 +32,12 @@ describe('ATVII: famílias, protótipos e migração', () => {
 
   it('migração pode ser aplicada a um banco da ATVI sem perder o projeto anterior', async () => {
     const legado = await servico.criar(projetoExemplo());
-    await db.undoLastMigration();
+    // Reverte a migração da ATVIII e a das famílias, voltando ao schema da ATVI.
+    await db.undoLastMigration(); await db.undoLastMigration();
     const [registro] = await db.query(`SELECT id FROM "${schema}".projetos WHERE id = $1`, [legado.projeto.id]);
     assert.equal(registro.id, legado.projeto.id);
     const aplicadas = await db.runMigrations();
-    assert.equal(aplicadas.length, 1);
-    assert.match(aplicadas[0]!.name, /FamiliasProjeto/);
+    assert.deepEqual(aplicadas.map(m => m.name), ['FamiliasProjeto1792000000000', 'ServicosProjeto1794000000000']);
     assert.deepEqual(await servico.buscar(legado.projeto.id), legado);
   });
 

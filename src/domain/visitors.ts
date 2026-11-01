@@ -15,7 +15,8 @@ function competenciasValidas(competencias: Competencia[]): boolean {
 export class ValidadorConsistencia implements VisitanteProjeto<string[]> {
   readonly equipe: Equipe | undefined;
   constructor(equipe?: Equipe) { this.equipe = equipe; }
-  visitarProjeto({ dados: p }: Projeto): string[] {
+  visitarProjeto(projeto: Projeto): string[] {
+    const p = projeto.dados;
     const erros: string[] = [];
     if (![p.id, p.titulo, p.genero, p.localizacao].every(texto)) erros.push('Projeto exige id, título, gênero e localização.');
     if (!Number.isFinite(p.duracaoMinutos) || p.duracaoMinutos <= 0) erros.push('Duração deve ser positiva.');
@@ -28,6 +29,7 @@ export class ValidadorConsistencia implements VisitanteProjeto<string[]> {
     const pesos = [p.parametros.pesoCompetencia, p.parametros.pesoAvaliacao, p.parametros.pesoPreco];
     if (pesos.some(v => !Number.isFinite(v) || v < 0 || v > 1) || pesos.reduce((a, b) => a + b, 0) === 0) erros.push('Pesos dos parâmetros devem estar entre zero e um, com soma positiva.');
     if (!Number.isInteger(p.parametros.limiteCandidatos) || p.parametros.limiteCandidatos < 1 || p.parametros.limiteCandidatos > 100) erros.push('Limite de candidatos deve estar entre 1 e 100.');
+    erros.push(...projeto.validarEstrutura());
     if (this.equipe) {
       const e = this.equipe;
       if (e.projetoId !== p.id) erros.push('Equipe pertence a outro projeto.');

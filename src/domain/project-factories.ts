@@ -7,6 +7,7 @@ import type { Equipe, Papel, ProfissionalDados, ProjetoDados } from './types.ts'
 import { criarEstrategia } from './strategies.ts';
 import type { RecomendacaoStrategy } from './strategies.ts';
 import { GeradorRelatorio } from './visitors.ts';
+import { criarServico } from './servicos.ts';
 import { NotificadorFamilia, NotificadorAnimacao, NotificadorDocumentario, NotificadorPublicitario,
   RecomendadorAnimacao, RecomendadorDocumentario, RecomendadorPublicitario,
   ValidadorFamilia, ValidadorAnimacao, ValidadorDocumentario, ValidadorPublicitario,
@@ -33,6 +34,10 @@ export class FabricaPadrao implements FabricaProjeto {
     const completos: ProjetoDados = { ...copia.dados, ...ajustes, id: ajustes.id ?? randomUUID(),
       parametros: { ...copia.dados.parametros, ...ajustes.parametros } };
     if (copia.dados.especificacoes || ajustes.especificacoes) completos.especificacoes = { ...copia.dados.especificacoes, ...ajustes.especificacoes };
+    // Uma nova lista de papéis sem hierarquia substitui a hierarquia herdada do modelo.
+    if (ajustes.papeis && !ajustes.servicos) delete completos.servicos;
+    // Com hierarquia, os papéis da recomendação são derivados dos serviços atômicos.
+    if (completos.servicos) completos.papeis = criarServico(completos.servicos).listarRequisitos();
     // A identidade da família vem da fábrica, nunca de uma combinação de produtos do cliente.
     if (this.tipo !== 'padrao' || dados.tipoProjeto) completos.tipoProjeto = this.tipo;
     Object.assign(copia, { dados: completos });

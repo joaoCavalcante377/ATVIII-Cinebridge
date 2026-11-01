@@ -1,0 +1,105 @@
+{
+  "titulo": "Curta com pós-produção",
+  "genero": "drama",
+  "duracaoMinutos": 15,
+  "orcamentoCentavos": 900000,
+  "inicio": "2027-03-01",
+  "prazo": "2027-03-30",
+  "tipoCaptacao": "ficcao",
+  "localizacao": "São Paulo",
+  "estrategia": "cosseno",
+  "servicos": {
+    "tipo": "pacote",
+    "nome": "Produção completa",
+    "execucao": "sequencial",
+    "servicos": [
+      {
+        "tipo": "atomico",
+        "nome": "Direção",
+        "custoCentavos": 90000,
+        "prazoDias": 10,
+        "papel": "DIRETOR",
+        "peso": 2,
+        "competencias": [
+          {
+            "nome": "direção",
+            "nivel": 5
+          }
+        ]
+      },
+      {
+        "tipo": "pacote",
+        "nome": "Pós-produção",
+        "execucao": "paralela",
+        "prazoMaximoDias": 12,
+        "servicos": [
+          {
+            "tipo": "pacote",
+            "nome": "Imagem",
+            "execucao": "sequencial",
+            "servicos": [
+              {
+                "tipo": "atomico",
+                "nome": "Edição",
+                "custoCentavos": 40000,
+                "prazoDias": 6,
+                "papel": "EDITOR",
+                "competencias": [
+                  {
+                    "nome": "montagem",
+                    "nivel": 5
+                  }
+                ]
+              },
+              {
+                "tipo": "atomico",
+                "nome": "Coloração",
+                "custoCentavos": 20000,
+                "prazoDias": 3,
+                "papel": "EDITOR",
+                "competencias": [
+                  {
+                    "nome": "colorização",
+                    "nivel": 4
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tipo": "atomico",
+            "nome": "Mixagem de áudio",
+            "custoCentavos": 25000,
+            "prazoDias": 5,
+            "papel": "SONOPLASTA",
+            "competencias": [
+              {
+                "nome": "mixagem",
+                "nivel": 4
+              }
+            ]
+          },
+          {
+            "tipo": "atomico",
+            "nome": "Efeitos visuais",
+            "custoCentavos": 35000,
+            "prazoDias": 8,
+            "papel": "EFEITOS_VISUAIS",
+            "competencias": [
+              {
+                "nome": "composição",
+                "nivel": 4
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "preferencias": {
+    "decoradores": [
+      "cache",
+      "auditoria"
+    ]
+  }
+}

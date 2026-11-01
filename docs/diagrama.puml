@@ -14,7 +14,6 @@ package "Aplicação" {
   }
   interface Repositorio
   class CatalogoProfissionais
-  class CacheRecomendacoes
 }
 package "Domínio" {
   class Projeto { +aceitar(visitante) }
@@ -59,9 +58,7 @@ API_Fastify --> ServicoEquipes
 ServicoEquipes --> Repositorio
 ServicoEquipes --> CatalogoProfissionais
 ServicoEquipes --> SistemaRecomendacao
-SistemaRecomendacao --> CacheRecomendacoes
-SistemaRecomendacao --> OrquestradorPadrao
-CacheRecomendacoes --> OrquestradorPadrao
+SistemaRecomendacao ..> OrquestradorPadrao : cria por requisição
 RepositorioPostgres ..|> Repositorio
 RepositorioPostgres --> PostgreSQL : TypeORM / transações
 OrquestradorPadrao --|> OrquestradorEquipe
@@ -172,5 +169,132 @@ ValidadorPublicitario ..|> VisitanteProjeto
 RelatorioPublicitario ..|> VisitanteProjeto
 RecomendadorPublicitario ..|> RecomendacaoStrategy
 NotificadorPublicitario ..|> Observador
+
+' ===================== ATVIII: padrões estruturais =====================
+class SistemaRecomendacao {
+  -adaptadorArmazenamento: AdaptadorArmazenamento
+  -adaptadorPagamento: AdaptadorPagamento
+  -adaptadorProfissional: AdaptadorProfissional
+  -estrategiaAtual: RecomendacaoStrategy
+  +executarRecomendacao(projeto: Projeto): Promise<Equipe>
+  +definirEstrategia(estrategia: RecomendacaoStrategy): void
+  +configurarAdaptadores(armazenamento, pagamento, profissional): void
+  +definirPoliticaDecoradores(politica: string[]): void
+}
+package "Adapter (ATVIII)" {
+  interface AdaptadorArmazenamento {
+    +salvarArquivo(conteudo: Buffer, metadados: MetadadosArquivo): Promise<string>
+    +recuperarArquivo(id: string): Promise<Buffer>
+    +listarArquivos(prefixo: string): Promise<string[]>
+  }
+  class ArmazenamentoExterno {
+    +upload(arquivo: File): Promise<string>
+    +download(id: string): Promise<File>
+    +listar(pasta: string): Promise<string[]>
+  }
+  class AdaptadorS3
+  class AdaptadorGoogleCloud
+  class AdaptadorLocal
+  interface AdaptadorPagamento {
+    +efetuarPagamento(valor: number, origem: string, destino: string): Promise<string>
+    +cancelarPagamento(id: string): Promise<boolean>
+    +verificarPagamento(id: string): Promise<StatusPagamento>
+  }
+  class GatewayPagamento {
+    +processarPagamento(valor: number, dados: Record): Promise<Transacao>
+    +estornarPagamento(id: string): Promise<boolean>
+    +consultarStatus(id: string): Promise<string>
+  }
+  class AdaptadorStripe
+  class AdaptadorPagSeguro
+  class AdaptadorPayPal
+  interface AdaptadorProfissional {
+    +listarProfissionais(criterios): Promise<Profissional[]>
+    +detalharProfissional(id: string): Promise<Profissional>
+    +registrarAvaliacao(id: string, avaliacao: Avaliacao): Promise<void>
+  }
+  class ApiProfissionalExterna {
+    +buscarProfissionais(filtros: Record): Promise<Record[]>
+    +obterPerfil(id: string): Promise<Record>
+    +avaliarProfissional(id: string, nota: number): Promise<void>
+  }
+  class AdaptadorLinkedIn
+  class AdaptadorIndeed
+  class AdaptadorInterno
+}
+SistemaRecomendacao --> AdaptadorArmazenamento : utiliza
+SistemaRecomendacao --> AdaptadorPagamento : utiliza
+SistemaRecomendacao --> AdaptadorProfissional : utiliza
+SistemaRecomendacao --> RecomendacaoStrategy : utiliza
+AdaptadorS3 ..|> AdaptadorArmazenamento
+AdaptadorGoogleCloud ..|> AdaptadorArmazenamento
+AdaptadorLocal ..|> AdaptadorArmazenamento
+AdaptadorArmazenamento "1" --> "0..1" ArmazenamentoExterno : adapta
+AdaptadorStripe ..|> AdaptadorPagamento
+AdaptadorPagSeguro ..|> AdaptadorPagamento
+AdaptadorPayPal ..|> AdaptadorPagamento
+AdaptadorPagamento "1" --> "0..1" GatewayPagamento : adapta
+AdaptadorLinkedIn ..|> AdaptadorProfissional
+AdaptadorIndeed ..|> AdaptadorProfissional
+AdaptadorInterno ..|> AdaptadorProfissional
+AdaptadorProfissional "1" --> "0..1" ApiProfissionalExterna : adapta
+AdaptadorInterno --> Repositorio : cadastro próprio
+note bottom of AdaptadorLocal
+  0..1: o disco local e o cadastro interno
+  não têm sistema externo a adaptar.
+end note
+
+package "Composite (ATVIII)" {
+  interface ServicoProjeto {
+    +calcularCusto(): number
+    +listarSubservicos(): ServicoProjeto[]
+    +obterPrazo(): number
+    +validar(): string[]
+    +listarRequisitos(): RequisitoPapel[]
+  }
+  class ServicoAtomico {
+    -custoCentavos: number
+    -prazoDias: number
+    -papel: Papel
+  }
+  class PacoteServico {
+    -execucao: sequencial | paralela
+    -prazoMaximoDias?: number
+    +adicionar(servico: ServicoProjeto)
+    +remover(servico: ServicoProjeto)
+  }
+}
+ServicoAtomico ..|> ServicoProjeto
+PacoteServico ..|> ServicoProjeto
+PacoteServico "1" o-- "1..*" ServicoProjeto : contém
+Projeto "1" --> "1" ServicoProjeto : servicoPrincipal
+note right of Projeto
+  calcularCustoTotal() e calcularPrazoTotal()
+  delegam ao serviço principal.
+end note
+
+package "Decorator (ATVIII)" {
+  class RecomendadorBase
+  abstract class RecomendacaoDecorator {
+    #interno: RecomendacaoStrategy
+    +recomendar(projeto, profissionais): Ranking
+  }
+  class CacheDecorator
+  class AuditoriaDecorator
+  class CompressaoDecorator
+  class RegistroDecoradores {
+    +registrar(nome, fabrica)
+    +montar(base, politica: string[]): RecomendacaoStrategy
+  }
+}
+RecomendadorBase ..|> RecomendacaoStrategy
+RecomendacaoDecorator ..|> RecomendacaoStrategy
+RecomendacaoDecorator "1" o-- "1" RecomendacaoStrategy : envolve
+CacheDecorator --|> RecomendacaoDecorator
+AuditoriaDecorator --|> RecomendacaoDecorator
+CompressaoDecorator --|> RecomendacaoDecorator
+RecomendadorBase --> RegistroFabricas : recomendador da família
+SistemaRecomendacao --> RegistroDecoradores : monta a pilha por política
+OrquestradorEquipe --> RecomendacaoStrategy : pilha decorada injetada
 
 @enduml

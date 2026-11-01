@@ -6,3 +6,4 @@ export * from './orchestrator.ts';
 export * from './factory-contracts.ts';
 export * from './project-factories.ts';
 export * from './family-components.ts';
+export * from './servicos.ts';

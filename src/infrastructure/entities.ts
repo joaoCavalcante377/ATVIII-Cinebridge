@@ -24,6 +24,7 @@ export const ProjetoEntity = new EntitySchema<ProjetoRegistro>({
     inicio: { type: 'text' }, prazo: { type: 'text' }, tipoCaptacao: { type: 'text' }, localizacao: { type: 'text' },
     papeis: { type: 'jsonb' }, estrategia: { type: 'text' }, parametros: { type: 'jsonb' },
     tipoProjeto: { type: 'text', nullable: true }, especificacoes: { type: 'jsonb', nullable: true },
+    servicos: { type: 'jsonb', nullable: true }, preferencias: { type: 'jsonb', nullable: true },
     recomendacaoAtualId: { type: 'text' }, excluidos: { type: 'jsonb' }, versao: { type: 'integer' },
   },
 });

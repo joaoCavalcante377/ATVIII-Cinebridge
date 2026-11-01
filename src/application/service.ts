@@ -1,13 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import { ErroDominio, PARAMETROS_PADRAO } from '../domain/types.ts';
-import type { EstadoProjeto, Evento, Papel, Parametros, ProjetoDados } from '../domain/types.ts';
+import type { Avaliacao, EstadoProjeto, Evento, Papel, Parametros, ProjetoDados } from '../domain/types.ts';
+import { resumirServico } from '../domain/servicos.ts';
+import type { ResumoServico } from '../domain/servicos.ts';
+import type { StatusPagamento } from './adaptadores.ts';
 import { SistemaRecomendacao } from './recommendation-system.ts';
 import type { Repositorio } from './ports.ts';
 import { CatalogoProfissionais } from './catalog.ts';
 
 export type NovoProjeto = Omit<ProjetoDados, 'id' | 'parametros'> & { parametros?: Partial<Parametros> };
 export type AjustesProjeto = Partial<Omit<NovoProjeto, 'tipoProjeto'>>;
-export type AlteracaoProjeto = Partial<Pick<ProjetoDados, 'orcamentoCentavos' | 'inicio' | 'prazo' | 'estrategia' | 'especificacoes'>> & { parametros?: Partial<Parametros> };
+export type AlteracaoProjeto = Partial<Pick<ProjetoDados, 'orcamentoCentavos' | 'inicio' | 'prazo' | 'estrategia' | 'especificacoes' | 'preferencias'>> & { parametros?: Partial<Parametros> };
+
+export interface PagamentoMembro {
+  papel: Papel; profissionalId: string; valorCentavos: number; transacaoId: string; status: StatusPagamento;
+}
 
 export function criarEvento(tipo: string, projetoId: string, dados: Record<string, unknown>): Evento {
   return { id: randomUUID(), tipo, projetoId, dados, ocorridoEm: new Date().toISOString() };
@@ -172,6 +179,63 @@ export class ServicoEquipes {
       }
       return this.mudanca(estado, eventos);
     });
+  }
+
+  /** Composite: custo, prazo e validação calculados pela raiz, recursivamente. */
+  async servicos(id: string): Promise<{ custoTotalCentavos: number; prazoTotalDias: number; erros: string[]; arvore: ResumoServico }> {
+    const estado = await this.buscar(id);
+    const projeto = this.sistema.criarProjeto(estado.projeto);
+    return { custoTotalCentavos: projeto.calcularCustoTotal(), prazoTotalDias: projeto.calcularPrazoTotal(),
+      erros: projeto.validarEstrutura(), arvore: resumirServico(projeto.servicoPrincipal, estado.equipe.membros) };
+  }
+
+  /** Adapter de armazenamento: a regra de negócio só conhece o contrato, não o provedor. */
+  async anexarArquivo(id: string, conteudo: Buffer, metadados: { nome: string; tipo?: string; categoria?: string }): Promise<{ id: string; provedor: string; bytes: number }> {
+    await this.buscar(id);
+    const adaptador = this.sistema.armazenamento;
+    const arquivo = await adaptador.salvarArquivo(conteudo, { ...metadados, prefixo: `projetos/${id}/` });
+    return { id: arquivo, provedor: adaptador.provedor, bytes: conteudo.length };
+  }
+  async listarArquivos(id: string): Promise<{ provedor: string; arquivos: string[] }> {
+    await this.buscar(id);
+    const adaptador = this.sistema.armazenamento;
+    return { provedor: adaptador.provedor, arquivos: await adaptador.listarArquivos(`projetos/${id}/`) };
+  }
+  async recuperarArquivo(id: string, arquivoId: string): Promise<Buffer> {
+    const { arquivos } = await this.listarArquivos(id);
+    if (!arquivos.includes(arquivoId)) throw new ErroDominio('Arquivo não encontrado neste projeto', 404);
+    return this.sistema.armazenamento.recuperarArquivo(arquivoId);
+  }
+
+  /**
+   * Adapter de pagamento: paga cada integrante de uma equipe confirmada. A referência por projeto,
+   * equipe e papel torna a operação idempotente; repetir a chamada não cobra novamente.
+   */
+  async pagar(id: string): Promise<{ provedor: string; pagamentos: PagamentoMembro[] }> {
+    const adaptador = this.sistema.pagamento;
+    const pagamentos: PagamentoMembro[] = [];
+    await this.repositorio.alterarEstado(id, async estado => {
+      if (estado.equipe.status !== 'CONFIRMADA') throw new ErroDominio('Somente equipes confirmadas podem ser pagas', 409);
+      for (const membro of estado.equipe.membros) {
+        const transacaoId = await adaptador.efetuarPagamento(membro.precoCentavos, `produtor:${id}`, `profissional:${membro.profissionalId}`,
+          `${id}:${estado.equipe.id}:${membro.papel}`);
+        pagamentos.push({ papel: membro.papel, profissionalId: membro.profissionalId, valorCentavos: membro.precoCentavos,
+          transacaoId, status: await adaptador.verificarPagamento(transacaoId) });
+      }
+      return this.mudanca(estado, [criarEvento('pagamentos.processados', id, { provedor: adaptador.provedor, pagamentos,
+        destinatarios: [`produtor:${id}`, ...pagamentos.map(p => `profissional:${p.profissionalId}`)] })]);
+    });
+    return { provedor: adaptador.provedor, pagamentos };
+  }
+  async verificarPagamento(transacaoId: string): Promise<{ provedor: string; transacaoId: string; status: StatusPagamento }> {
+    const adaptador = this.sistema.pagamento;
+    return { provedor: adaptador.provedor, transacaoId, status: await adaptador.verificarPagamento(transacaoId) };
+  }
+
+  /** Adapter de profissionais: a avaliação segue para a fonte configurada. */
+  async avaliarProfissional(profissionalId: string, avaliacao: Avaliacao): Promise<void> {
+    await this.sistema.profissional.registrarAvaliacao(profissionalId, avaliacao);
+    this.catalogo.invalidar();
   }
 
   async reavaliar(id: string, alteracao: AlteracaoProjeto): Promise<EstadoProjeto> {
